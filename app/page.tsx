@@ -22,17 +22,23 @@ function Main(){
   const [user,setUser]=useState<User|null>(null);
   const [profile,setProfile]=useState<Profile|null>(null);
   const [name,setName]=useState("");
+  const [ticketBalance,setTicketBalance]=useState(0);
   const [ready,setReady]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
 
-  async function refreshProfile(){
+  async function refreshAll(){
     if(!supabase)return;
-    const {data,error:e}=await supabase.rpc("shuri_get_my_profile");
-    if(e){setError(e.message);return;}
-    const p=(data?.[0]??null) as Profile|null;
+    const [pr,tickets]=await Promise.all([
+      supabase.rpc("shuri_get_my_profile"),
+      supabase.rpc("shuri_get_ticket_balance")
+    ]);
+    if(pr.error){setError(pr.error.message);return;}
+    if(tickets.error){setError(tickets.error.message);return;}
+    const p=(pr.data?.[0]??null) as Profile|null;
     setProfile(p);
     setName(p?.reality_name??"");
+    setTicketBalance(Number(tickets.data??0));
   }
 
   useEffect(()=>{
@@ -40,13 +46,13 @@ function Main(){
     supabase.auth.getUser().then(async({data,error})=>{
       if(error)setError(error.message);
       setUser(data.user);
-      if(data.user)await refreshProfile();
+      if(data.user)await refreshAll();
       setReady(true);
     });
     const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
       setUser(session?.user??null);
-      if(session?.user)setTimeout(()=>refreshProfile(),0);
-      else {setProfile(null);setName("");}
+      if(session?.user)setTimeout(()=>refreshAll(),0);
+      else {setProfile(null);setName("");setTicketBalance(0);}
     });
     return ()=>subscription.unsubscribe();
   },[supabase]);
@@ -66,7 +72,7 @@ function Main(){
     setBusy(true);setError("");
     const {error:e}=await supabase.rpc("shuri_save_reality_name",{new_name:name.trim()});
     if(e)setError(e.message);
-    else await refreshProfile();
+    else await refreshAll();
     setBusy(false);
   }
 
@@ -75,7 +81,7 @@ function Main(){
     setBusy(true);setError("");
     const {error:e}=await supabase.rpc("shuri_request_reality_verification");
     if(e)setError(e.message);
-    else await refreshProfile();
+    else await refreshAll();
     setBusy(false);
   }
 
@@ -106,6 +112,10 @@ function Main(){
       {view==="home"?<>
         <div className="eyebrow">WELCOME BACK</div>
         <h2>{profile?.reality_name||"しゅりなー"} さん 🐰</h2>
+        <div className="grid">
+          <div className="stat"><div className="muted">🎟 SHURI TICKET</div><strong>{ticketBalance}</strong><span className="small"> 枚</span></div>
+          <div className="stat"><div className="muted">✨ SHURI POINT</div><strong>0</strong><span className="small"> SP</span></div>
+        </div>
         <div className="card stack">
           <strong>✅ Googleログイン済み</strong>
           <p className="muted">本人確認：{statusLabel}</p>
