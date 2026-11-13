@@ -6,23 +6,47 @@ import AppShell from "@/components/AppShell";
 import {getSupabase} from "@/lib/supabase";
 import type {User} from "@supabase/supabase-js";
 
+type Profile={
+  user_id:string;
+  reality_name:string;
+  verification_status:"unverified"|"pending"|"verified"|"rejected";
+  verification_code:string|null;
+  verification_code_expires_at:string|null;
+  reality_verified_at:string|null;
+};
+
 function Main(){
   const supabase=getSupabase();
   const params=useSearchParams();
   const view=params.get("view")||"home";
   const [user,setUser]=useState<User|null>(null);
+  const [profile,setProfile]=useState<Profile|null>(null);
+  const [name,setName]=useState("");
   const [ready,setReady]=useState(false);
+  const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
+
+  async function refreshProfile(){
+    if(!supabase)return;
+    const {data,error:e}=await supabase.rpc("shuri_get_my_profile");
+    if(e){setError(e.message);return;}
+    const p=(data?.[0]??null) as Profile|null;
+    setProfile(p);
+    setName(p?.reality_name??"");
+  }
 
   useEffect(()=>{
     if(!supabase){setReady(true);return;}
-    supabase.auth.getUser().then(({data,error})=>{
+    supabase.auth.getUser().then(async({data,error})=>{
       if(error)setError(error.message);
       setUser(data.user);
+      if(data.user)await refreshProfile();
       setReady(true);
     });
     const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
       setUser(session?.user??null);
+      if(session?.user)setTimeout(()=>refreshProfile(),0);
+      else {setProfile(null);setName("");}
     });
     return ()=>subscription.unsubscribe();
   },[supabase]);
@@ -37,11 +61,31 @@ function Main(){
     if(e)setError(e.message);
   }
 
+  async function saveName(){
+    if(!supabase||!name.trim())return;
+    setBusy(true);setError("");
+    const {error:e}=await supabase.rpc("shuri_save_reality_name",{new_name:name.trim()});
+    if(e)setError(e.message);
+    else await refreshProfile();
+    setBusy(false);
+  }
+
+  async function issueCode(){
+    if(!supabase)return;
+    setBusy(true);setError("");
+    const {error:e}=await supabase.rpc("shuri_request_reality_verification");
+    if(e)setError(e.message);
+    else await refreshProfile();
+    setBusy(false);
+  }
+
   async function signOut(){
     if(!supabase)return;
     const {error:e}=await supabase.auth.signOut();
     if(e)setError(e.message);
   }
+
+  const statusLabel=profile?.verification_status==="verified"?"✅ 確認済み":profile?.verification_status==="pending"?"⏳ 承認待ち":profile?.verification_status==="rejected"?"❌ 再確認が必要":"未確認";
 
   return <AppShell>
     {!supabase?<div className="notice">🔧 Supabase接続設定が未完了です。</div>:null}
@@ -55,32 +99,42 @@ function Main(){
       </div>
       <div className="card stack">
         <h2>まずはログイン！</h2>
-        <p className="muted">Googleログインの接続テスト中です。ログイン後にREALITY名登録へ進みます。</p>
+        <p className="muted">Googleでログイン後、REALITY名を登録して本人確認へ進もう。</p>
         <button className="btn block" onClick={signIn} disabled={!supabase}>Googleでログイン</button>
       </div>
     </>:<>
       {view==="home"?<>
-        <div className="eyebrow">LOGIN SUCCESS</div>
-        <h2>Googleログイン完了 🐰</h2>
+        <div className="eyebrow">WELCOME BACK</div>
+        <h2>{profile?.reality_name||"しゅりなー"} さん 🐰</h2>
         <div className="card stack">
-          <strong>✅ Supabase Auth 接続成功</strong>
-          <p className="muted">ログイン中：{user.email??"Googleアカウント"}</p>
-          <p className="small">次はREALITY名登録と本人確認をSHURI GACHA専用DBへ接続します。</p>
+          <strong>✅ Googleログイン済み</strong>
+          <p className="muted">本人確認：{statusLabel}</p>
+          <Link className="btn" href="/?view=profile">REALITY名・本人確認へ</Link>
         </div>
         <div className="hero">
-          <div className="eyebrow">NEXT STEP</div>
-          <h1>PROFILE<br/>SETUP</h1>
-          <p>ログイン確認後、プロフィール機能を安全に接続します。</p>
+          <div className="eyebrow">NEXT EVENT</div>
+          <h1>COMING<br/>SOON!</h1>
+          <p>プロフィール確認後、ガチャ機能を順番に開放していきます。</p>
         </div>
-        <Link className="btn secondary" href="/?view=profile">ログイン情報を見る</Link>
       </>:<>
         <h2>MY PROFILE 🐰</h2>
         <div className="card stack">
-          <strong>Google認証済み</strong>
-          <p className="muted">{user.email??"メールアドレス取得なし"}</p>
-          <p className="small">REALITY表示名の登録機能は次の接続ステップで有効化します。</p>
+          <label htmlFor="reality">REALITY表示名</label>
+          <input id="reality" className="field" value={name} maxLength={40} onChange={e=>setName(e.target.value)} placeholder="REALITYでの名前"/>
+          <button className="btn" disabled={busy||!name.trim()} onClick={saveName}>表示名を保存</button>
+        </div>
+        <div className="card stack">
+          <h3>REALITY本人確認</h3>
+          <p className="muted">状態：{statusLabel}</p>
+          {profile?.verification_status!=="verified"?<>
+            <p className="small">確認コードを発行して、しゅりのREALITY配信コメントに投稿してください。しゅりが目視確認して承認します。</p>
+            {profile?.verification_code?<div className="code">{profile.verification_code}</div>:null}
+            {profile?.verification_code_expires_at?<p className="small">コード有効期限：15分</p>:null}
+            <button className="btn secondary" disabled={busy||!profile?.reality_name} onClick={issueCode}>{profile?.verification_code?"コードを再発行":"確認コードを発行"}</button>
+          </>:<p className="success">本人確認が完了しています！</p>}
         </div>
         <button className="btn secondary" onClick={signOut}>ログアウト</button>
+        <p className="muted">Googleメールアドレスは他のユーザーには公開されません。</p>
         <Link href="/" className="muted">← ホームへ戻る</Link>
       </>}
     </>}
