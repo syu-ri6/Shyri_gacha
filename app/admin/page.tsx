@@ -80,10 +80,9 @@ export default function Admin(){
           <button className="btn secondary" disabled={busy===r.user_id} onClick={()=>setStatus(r.user_id,"rejected")}>却下</button>
         </div>:null}
         {r.verification_status==="verified"?<div className="stack">
-          <div className="row">
-            <button className="btn secondary" disabled={busy===r.user_id} onClick={()=>setCounts(v=>({...v,[r.user_id]:"1"}))}>1枚</button>
-            <button className="btn secondary" disabled={busy===r.user_id} onClick={()=>setCounts(v=>({...v,[r.user_id]:"5"}))}>5枚</button>
-            <button className="btn secondary" disabled={busy===r.user_id} onClick={()=>setCounts(v=>({...v,[r.user_id]:"10"}))}>10枚</button>
+          <div className="ticket-presets">
+            {[1,2,3,4,5,6,7,8,9].map(n=><button key={n} className="btn secondary" disabled={busy===r.user_id} onClick={()=>setCounts(v=>({...v,[r.user_id]:String(n)}))}>{n}枚</button>)}
+            <button className="btn secondary" disabled={busy===r.user_id} onClick={()=>setCounts(v=>({...v,[r.user_id]:"10"}))}>10枚セット</button>
           </div>
           <input className="field" type="number" min="1" step="1" value={counts[r.user_id]||"1"} onChange={e=>setCounts(v=>({...v,[r.user_id]:e.target.value}))}/>
           <button className="btn" disabled={busy===r.user_id} onClick={()=>grant(r.user_id)}>🎟 チケットを配布</button>
