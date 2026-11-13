@@ -1,23 +1,54 @@
 "use client";
-import {useEffect,useState} from 'react';
-import Link from 'next/link';
-import AppShell from '@/components/AppShell';
-import {getSupabase} from '@/lib/supabase';
-type P={id:string;reality_name:string|null;verification_status:string;verification_code:string|null};
+import {useEffect,useState} from "react";
+import Link from "next/link";
+import AppShell from "@/components/AppShell";
+import {getSupabase} from "@/lib/supabase";
+
+type RequestRow={
+  user_id:string;
+  reality_name:string;
+  verification_status:string;
+  verification_requested_at:string|null;
+};
+
 export default function Admin(){
- const [profiles,setProfiles]=useState<P[]>([]);
- const [error,setError]=useState('');
- const [loading,setLoading]=useState(true);
- const [count,setCount]=useState<Record<string,string>>({});
- async function call(action:string,extra:Record<string,unknown>={}){
-  const supabase=getSupabase();if(!supabase)throw Error('Supabase is not configured');
-  const {data:{session}}=await supabase.auth.getSession();
-  if(!session)throw Error('ログインが必要です');
-  const res=await fetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({action,...extra})});
-  const data=await res.json();if(!res.ok)throw Error(data.error||'操作に失敗しました');return data;
- }
- async function load(){setError('');try{const d=await call('list');setProfiles(d.profiles)}catch(e){setError(e instanceof Error?e.message:'Error')}finally{setLoading(false)}}
- useEffect(()=>{load()},[]);
- async function action(a:string,extra:Record<string,unknown>){try{await call(a,extra);await load()}catch(e){setError(e instanceof Error?e.message:'Error')}}
- return <AppShell><div className="row"><h2>🔐 管理者画面</h2><Link href="/" className="muted">ホームへ</Link></div><p className="muted">本人確認コードをREALITY配信コメントと照合してから承認してください。</p>{error?<p className="notice danger">{error}</p>:null}{loading?<p>読み込み中...</p>:profiles.map(p=><div className="card stack" key={p.id}><strong>{p.reality_name||'名前未登録'}</strong><span className="muted">{p.verification_status}</span>{p.verification_code?<div className="code">{p.verification_code}</div>:null}{p.verification_status==='pending'?<div className="row"><button className="btn" onClick={()=>action('approve',{userId:p.id,status:'verified'})}>確認して承認</button><button className="btn secondary" onClick={()=>action('approve',{userId:p.id,status:'rejected'})}>却下</button></div>:null}{p.verification_status==='verified'?<div className="row"><input className="field" style={{maxWidth:110}} type="number" min="1" max="1000" value={count[p.id]||'1'} onChange={e=>setCount({...count,[p.id]:e.target.value})}/><button className="btn" onClick={()=>action('grant',{userId:p.id,count:Number(count[p.id]||1)})}>チケット配布</button></div>:null}</div>)}<p className="muted">この画面は管理者のGoogleメールアドレスでのみデータ取得・操作ができます。</p></AppShell>;
+  const supabase=getSupabase();
+  const [rows,setRows]=useState<RequestRow[]>([]);
+  const [error,setError]=useState("");
+  const [loading,setLoading]=useState(true);
+  const [busy,setBusy]=useState<string|null>(null);
+
+  async function load(){
+    if(!supabase){setError("Supabase is not configured");setLoading(false);return;}
+    setError("");
+    const {data,error:e}=await supabase.rpc("shuri_admin_list_pending");
+    if(e)setError(e.message);
+    else setRows((data??[]) as RequestRow[]);
+    setLoading(false);
+  }
+
+  useEffect(()=>{load()},[supabase]);
+
+  async function setStatus(userId:string,status:"verified"|"rejected"){
+    if(!supabase)return;
+    setBusy(userId);setError("");
+    const {error:e}=await supabase.rpc("shuri_admin_set_verification",{target_user:userId,new_status:status});
+    if(e)setError(e.message);
+    else await load();
+    setBusy(null);
+  }
+
+  return <AppShell>
+    <div className="row"><h2>🔐 本人確認</h2><Link href="/" className="muted">ホームへ</Link></div>
+    <p className="muted">配信で「申請したよ」と言われたら、REALITY名が一致していることを目視確認して承認します。</p>
+    {error?<p className="notice danger">{error}</p>:null}
+    {loading?<p>読み込み中...</p>:rows.length===0?<div className="card"><p className="muted">申請はまだありません。</p></div>:rows.map(r=><div className="card stack" key={r.user_id}>
+      <strong>{r.reality_name||"名前未登録"}</strong>
+      <span className="muted">状態：{r.verification_status==="pending"?"⏳ 承認待ち":r.verification_status==="verified"?"✅ 確認済み":"❌ 却下"}</span>
+      {r.verification_status==="pending"?<div className="row">
+        <button className="btn" disabled={busy===r.user_id} onClick={()=>setStatus(r.user_id,"verified")}>承認</button>
+        <button className="btn secondary" disabled={busy===r.user_id} onClick={()=>setStatus(r.user_id,"rejected")}>却下</button>
+      </div>:null}
+    </div>)}
+  </AppShell>;
 }
