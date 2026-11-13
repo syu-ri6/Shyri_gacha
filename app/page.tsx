@@ -1,11 +1,92 @@
 "use client";
-import {useEffect,useState} from 'react';import {useSearchParams} from 'next/navigation';import {Suspense} from 'react';import Link from 'next/link';import AppShell from '@/components/AppShell';import {getSupabase} from '@/lib/supabase';import type {User} from '@supabase/supabase-js';
-type Profile={reality_name:string|null;verification_status:string;verification_code:string|null};
-function Main(){const supabase=getSupabase();const params=useSearchParams();const view=params.get('view')||'home';const [user,setUser]=useState<User|null>(null);const [profile,setProfile]=useState<Profile|null>(null);const [name,setName]=useState('');const [balance,setBalance]=useState(0);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [ready,setReady]=useState(false);
-async function refresh(u:User){if(!supabase)return;const [pr,ledger]=await Promise.all([supabase.from('profiles').select('reality_name,verification_status,verification_code').eq('id',u.id).maybeSingle(),supabase.from('ticket_ledger').select('delta').eq('user_id',u.id)]);if(pr.error)setError(pr.error.message);setProfile(pr.data as Profile|null);setName(pr.data?.reality_name||'');setBalance((ledger.data||[]).reduce((a,v)=>a+v.delta,0));}
-useEffect(()=>{if(!supabase){setReady(true);return}supabase.auth.getUser().then(({data})=>{setUser(data.user);if(data.user)refresh(data.user);setReady(true)});const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,session)=>{setUser(session?.user||null);if(session?.user) setTimeout(()=>refresh(session.user),0);else setProfile(null)});return ()=>subscription.unsubscribe()},[]);
-async function signIn(){if(!supabase)return;setError('');const {error:e}=await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin}});if(e)setError(e.message)}
-async function saveName(){if(!supabase||!user||!name.trim())return;setBusy(true);setError('');const {error:e}=await supabase.from('profiles').upsert({id:user.id,reality_name:name.trim()},{onConflict:'id'});if(e)setError(e.message);await refresh(user);setBusy(false)}
-async function issueCode(){if(!supabase||!user)return;setBusy(true);setError('');const {error:e}=await supabase.rpc('request_reality_verification');if(e)setError(e.message);await refresh(user);setBusy(false)}
-return <AppShell>{!supabase?<div className="notice">🔧 接続設定が未完了です。READMEの手順でSupabaseを設定するとログインが有効になります。</div>:null}{error?<p className="notice danger" role="alert">{error}</p>:null}{!ready?<p className="spinner">読み込み中...</p>:!user?<><div className="hero"><div className="eyebrow">WELCOME TO THE WORLD OF</div><h1>SHURI<br/>GACHA 🎰</h1><p>しゅりなーだけの、わくわくコレクション。</p><span className="tag">💪🏻🐰 Papparapappappa</span></div><div className="card stack"><h2>まずはログイン！</h2><p className="muted">Googleでログイン後、REALITY名を登録して本人確認に進もう。</p><button className="btn block" onClick={signIn} disabled={!supabase}>Googleでログイン</button></div></>:<>{view==='home'?<><div className="eyebrow">WELCOME BACK</div><h2>{profile?.reality_name||'しゅりなー'} さん 🐰</h2><div className="grid"><div className="stat"><div className="muted">🎟 SHURI TICKET</div><strong>{balance}</strong><span className="small"> 枚</span></div><div className="stat"><div className="muted">✨ SHURI POINT</div><strong>0</strong><span className="small"> SP</span></div></div><div className="hero"><div className="eyebrow">NEXT EVENT</div><h1>COMING<br/>SOON!</h1><p>次のSHURI GACHAをお楽しみに！</p></div><div className="card"><h3>本人確認</h3><p className="muted">現在の状態：{profile?.verification_status==='verified'?'✅ 確認済み':profile?.verification_status==='pending'?'⏳ 承認待ち':'未確認'}</p><Link className="btn" href="/?view=profile">マイページで確認</Link></div><div className="card"><h3>📣 お知らせ</h3><p className="muted">イベントやチケット配布のお知らせがここに届きます。</p></div></>:view==='profile'?<><h2>MY PROFILE 🐰</h2><div className="card"><label htmlFor="reality">REALITY表示名</label><input id="reality" className="field" value={name} maxLength={40} onChange={e=>setName(e.target.value)} placeholder="REALITYでの名前"/><button className="btn" disabled={busy||!name.trim()} onClick={saveName}>表示名を保存</button></div><div className="card stack"><h3>REALITY本人確認</h3><p className="muted">状態：{profile?.verification_status==='verified'?'確認済み':profile?.verification_status==='pending'?'承認待ち':'未確認'}</p>{profile?.verification_status!=='verified'?<><p className="small">下のコードを発行して、しゅりのREALITY配信コメントに投稿してください。しゅりが確認後、管理画面で承認します。</p>{profile?.verification_code?<div className="code">{profile.verification_code}</div>:null}<button className="btn secondary" disabled={busy||!name.trim()} onClick={issueCode}>{profile?.verification_code?'コードを再発行':'確認コードを発行'}</button></>:<p className="success">本人確認が完了しています！</p>}</div><button className="btn secondary" onClick={()=>supabase?.auth.signOut()}>ログアウト</button><p className="muted">メールアドレスは他のユーザーには公開されません。</p><Link href="/admin" className="muted">管理者はこちら →</Link></>:<><h2>{view==='gacha'?'GACHA 🎰':view==='shop'?'SP SHOP 🛍️':'COLLECTION 🎧'}</h2><div className="card stack"><h3>{view==='collection'?'コレクションは準備中':'COMING SOON'}</h3><p className="muted">{view==='gacha'?'現在開催中のイベントはありません。チケットは次回へ持ち越せます。':view==='shop'?'現在交換できるイベントはありません。SPはイベントごとに管理され、終了時に失効します。':'獲得したアイテムがここに並ぶ予定です。'}</p><Link href="/" className="btn secondary">ホームに戻る</Link></div></>}</>}</AppShell>}
-export default function Page(){return <Suspense fallback={<div className="app">読み込み中...</div>}><Main/></Suspense>}
+import {Suspense,useEffect,useState} from "react";
+import {useSearchParams} from "next/navigation";
+import Link from "next/link";
+import AppShell from "@/components/AppShell";
+import {getSupabase} from "@/lib/supabase";
+import type {User} from "@supabase/supabase-js";
+
+function Main(){
+  const supabase=getSupabase();
+  const params=useSearchParams();
+  const view=params.get("view")||"home";
+  const [user,setUser]=useState<User|null>(null);
+  const [ready,setReady]=useState(false);
+  const [error,setError]=useState("");
+
+  useEffect(()=>{
+    if(!supabase){setReady(true);return;}
+    supabase.auth.getUser().then(({data,error})=>{
+      if(error)setError(error.message);
+      setUser(data.user);
+      setReady(true);
+    });
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
+      setUser(session?.user??null);
+    });
+    return ()=>subscription.unsubscribe();
+  },[supabase]);
+
+  async function signIn(){
+    if(!supabase)return;
+    setError("");
+    const {error:e}=await supabase.auth.signInWithOAuth({
+      provider:"google",
+      options:{redirectTo:window.location.origin}
+    });
+    if(e)setError(e.message);
+  }
+
+  async function signOut(){
+    if(!supabase)return;
+    const {error:e}=await supabase.auth.signOut();
+    if(e)setError(e.message);
+  }
+
+  return <AppShell>
+    {!supabase?<div className="notice">🔧 Supabase接続設定が未完了です。</div>:null}
+    {error?<p className="notice danger" role="alert">{error}</p>:null}
+    {!ready?<p className="spinner">読み込み中...</p>:!user?<>
+      <div className="hero">
+        <div className="eyebrow">WELCOME TO THE WORLD OF</div>
+        <h1>SHURI<br/>GACHA 🎰</h1>
+        <p>しゅりなーだけの、わくわくコレクション。</p>
+        <span className="tag">💪🏻🐰 Papparapappappa</span>
+      </div>
+      <div className="card stack">
+        <h2>まずはログイン！</h2>
+        <p className="muted">Googleログインの接続テスト中です。ログイン後にREALITY名登録へ進みます。</p>
+        <button className="btn block" onClick={signIn} disabled={!supabase}>Googleでログイン</button>
+      </div>
+    </>:<>
+      {view==="home"?<>
+        <div className="eyebrow">LOGIN SUCCESS</div>
+        <h2>Googleログイン完了 🐰</h2>
+        <div className="card stack">
+          <strong>✅ Supabase Auth 接続成功</strong>
+          <p className="muted">ログイン中：{user.email??"Googleアカウント"}</p>
+          <p className="small">次はREALITY名登録と本人確認をSHURI GACHA専用DBへ接続します。</p>
+        </div>
+        <div className="hero">
+          <div className="eyebrow">NEXT STEP</div>
+          <h1>PROFILE<br/>SETUP</h1>
+          <p>ログイン確認後、プロフィール機能を安全に接続します。</p>
+        </div>
+        <Link className="btn secondary" href="/?view=profile">ログイン情報を見る</Link>
+      </>:<>
+        <h2>MY PROFILE 🐰</h2>
+        <div className="card stack">
+          <strong>Google認証済み</strong>
+          <p className="muted">{user.email??"メールアドレス取得なし"}</p>
+          <p className="small">REALITY表示名の登録機能は次の接続ステップで有効化します。</p>
+        </div>
+        <button className="btn secondary" onClick={signOut}>ログアウト</button>
+        <Link href="/" className="muted">← ホームへ戻る</Link>
+      </>}
+    </>}
+  </AppShell>;
+}
+
+export default function Page(){
+  return <Suspense fallback={<div className="app">読み込み中...</div>}><Main/></Suspense>;
+}
