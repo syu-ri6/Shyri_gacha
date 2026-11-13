@@ -32,6 +32,7 @@ function Main(){
   const [results,setResults]=useState<DrawResult[]>([]);
   const [pendingResults,setPendingResults]=useState<DrawResult[]>([]);
   const [animating,setAnimating]=useState(false);
+  const [gachaStage,setGachaStage]=useState<"idle"|"tap"|"charging"|"reveal">("idle");
   const [animationRarity,setAnimationRarity]=useState("N");
   const [ready,setReady]=useState(false);
   const [busy,setBusy]=useState(false);
@@ -124,16 +125,27 @@ function Main(){
       setAnimationRarity(best.rarity);
       setPendingResults(rows);
       setAnimating(true);
+      setGachaStage("tap");
       setTicketBalance(Number(rows[0].remaining_balance));
-      window.setTimeout(()=>{
-        setResults(rows);
-        setAnimating(false);
-        setPendingResults([]);
-        setBusy(false);
-      }, best.rarity==="UR"?3000:best.rarity==="SSR"?2500:best.rarity==="SR"?2200:1800);
     }else{
       setBusy(false);
     }
+  }
+
+  function handleGachaTap(){
+    if(gachaStage!=="tap")return;
+    setGachaStage("charging");
+    const ms=animationRarity==="UR"?2800:animationRarity==="SSR"?2200:animationRarity==="SR"?1600:animationRarity==="R"?1000:700;
+    window.setTimeout(()=>{
+      setGachaStage("reveal");
+      setResults(pendingResults);
+      window.setTimeout(()=>{
+        setAnimating(false);
+        setPendingResults([]);
+        setGachaStage("idle");
+        setBusy(false);
+      },900);
+    },ms);
   }
 
   async function signOut(){
@@ -166,7 +178,7 @@ function Main(){
         {profile?.verification_status!=="verified"?<div className="card stack"><h3>本人確認が必要です</h3><p className="muted">ガチャを引く前にREALITY本人確認を完了してね。</p><Link className="btn" href="/?view=profile">本人確認へ</Link></div>:!event?<div className="card stack"><h3>現在開催中のガチャはありません</h3><p className="muted">次のイベントをお楽しみに！</p></div>:<>
           <div className="hero"><div className="eyebrow">NOW OPEN</div><h1>{event.title}</h1><p>1回＝1チケット。10回＝10チケット。</p></div>
           <div className="gacha-actions"><button className="btn" disabled={busy||ticketBalance<1} onClick={()=>draw(1)}>🎟 1回引く</button><button className="btn" disabled={busy||ticketBalance<10} onClick={()=>draw(10)}>🎟 10回引く</button></div>
-          {animating?<div className={"gacha-overlay rarity-"+animationRarity.toLowerCase()}>
+          {animating?<div className={"gacha-overlay stage-"+gachaStage+(gachaStage==="reveal"?" rarity-"+animationRarity.toLowerCase():"")} onClick={handleGachaTap}>
             <div className="gacha-backdrop"/>
             <div className="gacha-rays"/>
             <div className="gacha-stage">
@@ -175,11 +187,17 @@ function Main(){
                 <div className="gacha-handle"/>
               </div>
               <div className="gacha-capsule"><span>✦</span></div>
-              <div className="gacha-burst">✦ ✧ ✦</div>
-              <div className="gacha-message">
-                {animationRarity==="UR"?"ULTRA RARE!!":animationRarity==="SSR"?"SSR CHANCE!!":animationRarity==="SR"?"SR CHANCE!":"PAPPARAPAPPAPPA!"}
-              </div>
-              <div className="gacha-tap">抽選中...</div>
+              {gachaStage==="tap"?<>
+                <div className="gacha-message">TAP!</div>
+                <div className="gacha-tap">画面をタップ</div>
+              </>:gachaStage==="charging"?<>
+                <div className="gacha-burst">✦ ✧ ✦</div>
+                <div className="gacha-message">ため中...</div>
+                <div className="gacha-tap">結果を待ってね</div>
+              </>:<>
+                <div className="gacha-burst">✦ ✧ ✦</div>
+                <div className="gacha-message">{animationRarity==="UR"?"ULTRA RARE!!":animationRarity==="SSR"?"SSR!!":animationRarity==="SR"?"SR!!":animationRarity==="R"?"R!":"N!"}</div>
+              </>}
             </div>
           </div>:null}
           {results.length>0?<div className={"card stack result-panel rarity-"+animationRarity.toLowerCase()}><h3>✨ RESULT</h3><div className="result-grid">{results.map((r,i)=><div className={"result-card reveal rarity-"+r.rarity.toLowerCase()} style={{animationDelay:(i*90)+"ms"}} key={r.result_position}><span className="rarity">{r.rarity}</span><strong>{r.prize_title}</strong></div>)}</div><p className="muted">残り 🎟 {ticketBalance}枚</p></div>:null}
