@@ -70,7 +70,7 @@ function Main(){
     setBusy(false);
   }
 
-  async function issueCode(){
+  async function requestVerification(){
     if(!supabase)return;
     setBusy(true);setError("");
     const {error:e}=await supabase.rpc("shuri_request_reality_verification");
@@ -127,10 +127,8 @@ function Main(){
           <h3>REALITY本人確認</h3>
           <p className="muted">状態：{statusLabel}</p>
           {profile?.verification_status!=="verified"?<>
-            <p className="small">確認コードを発行して、しゅりのREALITY配信コメントに投稿してください。しゅりが目視確認して承認します。</p>
-            {profile?.verification_code?<div className="code">{profile.verification_code}</div>:null}
-            {profile?.verification_code_expires_at?<p className="small">コード有効期限：15分</p>:null}
-            <button className="btn secondary" disabled={busy||!profile?.reality_name} onClick={issueCode}>{profile?.verification_code?"コードを再発行":"確認コードを発行"}</button>
+            <p className="small">「本人確認を申請」を押したら、しゅりのREALITY配信で「申請したよ」と教えてください。REALITY名を見て、しゅりが管理画面から承認します。</p>
+            <button className="btn secondary" disabled={busy||!profile?.reality_name||profile?.verification_status==="pending"} onClick={requestVerification}>{profile?.verification_status==="pending"?"申請済み":"本人確認を申請"}</button>
           </>:<p className="success">本人確認が完了しています！</p>}
         </div>
         <button className="btn secondary" onClick={signOut}>ログアウト</button>
