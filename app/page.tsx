@@ -190,10 +190,40 @@ function Main(){
         <div className="card stack"><h3>REALITY本人確認</h3><p className="muted">状態：{statusLabel}</p>{profile?.verification_status!=="verified"?<><p className="small">「本人確認を申請」を押したら、配信で「申請したよ」と教えてください。</p><button className="btn secondary" disabled={busy||!profile?.reality_name||profile?.verification_status==="pending"} onClick={requestVerification}>{profile?.verification_status==="pending"?"申請済み":"本人確認を申請"}</button></>:<p className="success">本人確認が完了しています！</p>}</div>
         <button className="btn secondary" onClick={signOut}>ログアウト</button><p className="muted">Googleメールアドレスは他のユーザーには公開されません。</p><Link href="/" className="muted">← ホームへ戻る</Link>
       </>:view==="gacha"?<>
-        <div className="row"><h2>GACHA 🎰</h2><strong>🎟 {ticketBalance}枚</strong></div>
+        <div className="gacha-header">
+          <h2>GACHA 🎰</h2>
+          <div className="gacha-balances">
+            <span>🎟 {ticketBalance}</span>
+            <span>✨ {spBalance} SP</span>
+          </div>
+        </div>
         {profile?.verification_status!=="verified"?<div className="card stack"><h3>本人確認が必要です</h3><p className="muted">ガチャを引く前にREALITY本人確認を完了してね。</p><Link className="btn" href="/?view=profile">本人確認へ</Link></div>:!event?<div className="card stack"><h3>現在開催中のガチャはありません</h3><p className="muted">次のイベントをお楽しみに！</p></div>:<>
-          <div className="hero"><div className="eyebrow">NOW OPEN</div><h1>{event.title}</h1><p>1回＝1チケット。10回＝10チケット。</p></div>
-          <div className="gacha-actions"><button className="btn" disabled={busy||ticketBalance<1} onClick={()=>draw(1)}>🎟 1回引く</button><button className="btn" disabled={busy||ticketBalance<10} onClick={()=>draw(10)}>🎟 10回引く</button></div>
+          <div className="gacha-event-card">
+            <div>
+              <div className="eyebrow">NOW OPEN</div>
+              <h1>{event.title}</h1>
+            </div>
+            <span className="tag">1回 = 1枚</span>
+          </div>
+
+          <div className="card gacha-draw-card">
+            <div className="gacha-draw-head">
+              <div>
+                <strong>ガチャを引く</strong>
+                <div className="muted">結果は演出のあとに表示されます</div>
+              </div>
+            </div>
+            <div className="gacha-actions">
+              <button className="btn" disabled={busy||ticketBalance<1} onClick={()=>draw(1)}>
+                <span className="draw-count">1回</span>
+                <span className="draw-cost">🎟 1枚</span>
+              </button>
+              <button className="btn secondary" disabled={busy||ticketBalance<10} onClick={()=>draw(10)}>
+                <span className="draw-count">10回</span>
+                <span className="draw-cost">🎟 10枚</span>
+              </button>
+            </div>
+          </div>
           {animating?<div className={"gacha-overlay stage-"+gachaStage+(gachaStage==="reveal"?" rarity-"+animationRarity.toLowerCase():"")} onClick={handleGachaTap}>
             <div className="gacha-backdrop"/>
             <div className="gacha-rays"/>
@@ -217,7 +247,12 @@ function Main(){
             </div>
           </div>:null}
           {results.length>0?<div className={"card stack result-panel rarity-"+animationRarity.toLowerCase()}><h3>✨ RESULT</h3><div className="result-grid">{results.map((r,i)=><div className={"result-card reveal rarity-"+r.rarity.toLowerCase()} style={{animationDelay:(i*90)+"ms"}} key={r.result_position}><span className="rarity">{r.rarity}</span><strong>{r.prize_title}</strong><span className={r.is_duplicate?"dupe-badge":"new-badge"}>{r.is_duplicate?"重複 +"+r.sp_awarded+" SP":"NEW!"}</span></div>)}</div><p className="muted">残り 🎟 {ticketBalance}枚</p></div>:null}
-          <div className="card stack"><h3>提供割合</h3>{prizes.map(p=><div className="prob-row" key={p.id}><span><b>{p.rarity}</b> {p.display_title}</span><span>{Number(p.probability).toFixed(2)}%</span></div>)}</div>
+          <details className="card odds-card">
+            <summary>提供割合を見る</summary>
+            <div className="odds-list">
+              {prizes.map(p=><div className="prob-row" key={p.id}><span><b>{p.rarity}</b> {p.display_title}</span><span>{Number(p.probability).toFixed(2)}%</span></div>)}
+            </div>
+          </details>
         </>}
       </>:view==="collection"?<>
         <div className="row"><h2>COLLECTION 🎧</h2><strong>✨ {spBalance} SP</strong></div>
