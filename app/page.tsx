@@ -30,6 +30,9 @@ function Main(){
   const [event,setEvent]=useState<GachaEvent|null>(null);
   const [prizes,setPrizes]=useState<GachaPrize[]>([]);
   const [results,setResults]=useState<DrawResult[]>([]);
+  const [pendingResults,setPendingResults]=useState<DrawResult[]>([]);
+  const [animating,setAnimating]=useState(false);
+  const [animationRarity,setAnimationRarity]=useState("N");
   const [ready,setReady]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
@@ -105,16 +108,32 @@ function Main(){
 
   async function draw(count:1|10){
     if(!supabase)return;
-    setBusy(true);setError("");setResults([]);
+    setBusy(true);setError("");setResults([]);setPendingResults([]);
     const key=crypto.randomUUID();
     const {data,error:e}=await supabase.rpc("shuri_draw_gacha",{pull_count:count,request_key:key});
-    if(e)setError(e.message);
-    else {
-      const rows=(data??[]) as DrawResult[];
-      setResults(rows);
-      if(rows.length)setTicketBalance(Number(rows[0].remaining_balance));
+    if(e){
+      setError(e.message);
+      setBusy(false);
+      return;
     }
-    setBusy(false);
+
+    const rows=(data??[]) as DrawResult[];
+    if(rows.length){
+      const rank:Record<string,number>={N:1,R:2,SR:3,SSR:4,UR:5};
+      const best=rows.reduce((a,b)=>(rank[b.rarity]||0)>(rank[a.rarity]||0)?b:a,rows[0]);
+      setAnimationRarity(best.rarity);
+      setPendingResults(rows);
+      setAnimating(true);
+      setTicketBalance(Number(rows[0].remaining_balance));
+      window.setTimeout(()=>{
+        setResults(rows);
+        setAnimating(false);
+        setPendingResults([]);
+        setBusy(false);
+      }, best.rarity==="UR"?1900:best.rarity==="SSR"?1650:best.rarity==="SR"?1450:1200);
+    }else{
+      setBusy(false);
+    }
   }
 
   async function signOut(){
@@ -147,7 +166,14 @@ function Main(){
         {profile?.verification_status!=="verified"?<div className="card stack"><h3>本人確認が必要です</h3><p className="muted">ガチャを引く前にREALITY本人確認を完了してね。</p><Link className="btn" href="/?view=profile">本人確認へ</Link></div>:!event?<div className="card stack"><h3>現在開催中のガチャはありません</h3><p className="muted">次のイベントをお楽しみに！</p></div>:<>
           <div className="hero"><div className="eyebrow">NOW OPEN</div><h1>{event.title}</h1><p>1回＝1チケット。10回＝10チケット。</p></div>
           <div className="gacha-actions"><button className="btn" disabled={busy||ticketBalance<1} onClick={()=>draw(1)}>🎟 1回引く</button><button className="btn" disabled={busy||ticketBalance<10} onClick={()=>draw(10)}>🎟 10回引く</button></div>
-          {results.length>0?<div className="card stack"><h3>✨ RESULT</h3><div className="result-grid">{results.map(r=><div className={"result-card rarity-"+r.rarity.toLowerCase()} key={r.result_position}><span className="rarity">{r.rarity}</span><strong>{r.prize_title}</strong></div>)}</div><p className="muted">残り 🎟 {ticketBalance}枚</p></div>:null}
+          {animating?<div className={"gacha-animation rarity-"+animationRarity.toLowerCase()}>
+            <div className="gacha-orb">
+              <span className="gacha-stars">✦ ✧ ✦</span>
+              <div className="gacha-core">🐰</div>
+              <span className="gacha-caption">{animationRarity==="UR"?"ULTRA RARE!?":animationRarity==="SSR"?"SUPER RARE!?":animationRarity==="SR"?"RARE CHANCE!":"DRAWING..."}</span>
+            </div>
+          </div>:null}
+          {results.length>0?<div className={"card stack result-panel rarity-"+animationRarity.toLowerCase()}><h3>✨ RESULT</h3><div className="result-grid">{results.map((r,i)=><div className={"result-card reveal rarity-"+r.rarity.toLowerCase()} style={{animationDelay:(i*90)+"ms"}} key={r.result_position}><span className="rarity">{r.rarity}</span><strong>{r.prize_title}</strong></div>)}</div><p className="muted">残り 🎟 {ticketBalance}枚</p></div>:null}
           <div className="card stack"><h3>提供割合</h3>{prizes.map(p=><div className="prob-row" key={p.id}><span><b>{p.rarity}</b> {p.display_title}</span><span>{Number(p.probability).toFixed(2)}%</span></div>)}</div>
         </>}
       </>:<div className="card stack"><h2>{view==="shop"?"SP SHOP 🛍️":"COLLECTION 🎧"}</h2><p className="muted">この機能は次の開発ステップでつなぎます。</p><Link href="/" className="btn secondary">ホームへ</Link></div>}
