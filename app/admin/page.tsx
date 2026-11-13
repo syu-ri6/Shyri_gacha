@@ -82,7 +82,7 @@ export default function Admin(){
   async function addPrize(){
     if(!supabase||!selected||!prizeTitle.trim())return;
     const w=Number(weight);
-    if(!Number.isFinite(w)||w<=0)return setError("重みは0より大きい数字にしてね");
+    if(!Number.isFinite(w)||w<=0)return setError("確率は0より大きい数字にしてね");
     setBusy("prize-new");setError("");
     const {error:e}=await supabase.rpc("shuri_admin_add_prize",{target_event:selected,prize_title:prizeTitle.trim(),prize_rarity:rarity,prize_weight:w,secret_prize:secret});
     if(e)setError(e.message); else {setPrizeTitle("");setWeight("1");setSecret(false);await Promise.all([load(),loadPrizes(selected)]);}
@@ -122,28 +122,29 @@ export default function Admin(){
       {events.length>0?<div className="event-tabs">{events.map(e=><button key={e.id} className={selected===e.id?"event-tab active":"event-tab"} onClick={()=>setSelected(e.id)}>{e.title}<small>{e.status}</small></button>)}</div>:null}
 
       {current?<div className="card stack">
-        <div className="row"><div><h3 style={{margin:0}}>{current.title}</h3><span className="muted">状態：{current.status} / 景品 {current.prize_count}個</span></div><span className="tag">重み合計 {Number(current.total_weight)}</span></div>
+        <div className="row"><div><h3 style={{margin:0}}>{current.title}</h3><span className="muted">状態：{current.status} / 景品 {current.prize_count}個</span></div><span className="tag">確率合計 {Number(current.total_weight)}%</span></div>
         {current.status==="draft"?<>
           <div className="divider"/>
           <h3>景品を追加</h3>
           <input className="field" value={prizeTitle} maxLength={120} onChange={e=>setPrizeTitle(e.target.value)} placeholder="景品名"/>
           <div className="grid">
             <select className="field" value={rarity} onChange={e=>setRarity(e.target.value)}>{["N","R","SR","SSR","UR"].map(r=><option key={r}>{r}</option>)}</select>
-            <input className="field" type="number" min="0.0001" step="0.1" value={weight} onChange={e=>setWeight(e.target.value)} placeholder="重み"/>
+            <input className="field" type="number" min="0.0001" step="0.1" max="100" value={weight} onChange={e=>setWeight(e.target.value)} placeholder="確率（%）"/>
           </div>
           <label className="check-row"><input type="checkbox" checked={secret} onChange={e=>setSecret(e.target.checked)}/> シークレット景品（未獲得時は？？？表示）</label>
           <button className="btn" disabled={busy==="prize-new"||!prizeTitle.trim()} onClick={addPrize}>＋ 景品を追加</button>
         </>:<p className="notice">公開後は景品構成を変更できません。</p>}
 
+        <div className={Math.abs(total-100)<0.0001?"notice success":"notice"}>確率合計：{total.toFixed(2)}% {Math.abs(total-100)<0.0001?"✓":"（100%にすると公開できます）"}</div>
         <div className="stack">
           {prizes.map(p=><div className="prize-admin" key={p.id}>
-            <div><b>{p.rarity}</b> {p.is_secret?"🔒 ":""}{p.title}<div className="muted">重み {Number(p.weight)}{total>0?" / 約"+((Number(p.weight)/total)*100).toFixed(2)+"%":""}</div></div>
+            <div><b>{p.rarity}</b> {p.is_secret?"🔒 ":""}{p.title}<div className="muted">確率 {Number(p.weight)}%</div></div>
             {current.status==="draft"?<button className="mini-danger" disabled={busy===p.id} onClick={()=>deletePrize(p.id)}>削除</button>:null}
           </div>)}
         </div>
 
         <div className="row">
-          {current.status==="draft"?<button className="btn" disabled={busy==="event-"+current.id||prizes.length===0} onClick={()=>setEventStatus(current.id,"active")}>🚀 公開して開始</button>:null}
+          {current.status==="draft"?<button className="btn" disabled={busy==="event-"+current.id||prizes.length===0||Math.abs(total-100)>0.0001} onClick={()=>setEventStatus(current.id,"active")}>🚀 公開して開始</button>:null}
           {current.status==="active"?<><button className="btn secondary" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"paused")}>⏸ 一時停止</button><button className="btn secondary" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"ended")}>終了</button></>:null}
           {current.status==="paused"?<><button className="btn" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"active")}>▶ 再開</button><button className="btn secondary" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"ended")}>終了</button></>:null}
         </div>
