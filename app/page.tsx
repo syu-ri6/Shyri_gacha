@@ -228,22 +228,20 @@ function Main(){
             <div className="gacha-backdrop"/>
             <div className="gacha-rays"/>
             <div className="gacha-stage">
-              <div className="gacha-machine">
-                <div className="gacha-window">🐰</div>
-                <div className="gacha-handle"/>
+              <img className="gacha-machine-art" src="/assets/shuri-gacha-machine.svg" alt="SHURI GACHA machine"/>
+              <img className="gacha-capsule-art" src="/assets/shuri-capsule.svg" alt="gacha capsule"/>
+              <div className="gacha-copy">
+                {gachaStage==="tap"?<>
+                  <div className="gacha-message">TAP!</div>
+                  <div className="gacha-tap">画面をタップ</div>
+                </>:gachaStage==="charging"?<>
+                  <div className="gacha-message">ため中...</div>
+                  <div className="gacha-tap">結果を待ってね</div>
+                </>:<>
+                  <div className="gacha-burst">✦ ✧ ✦</div>
+                  <div className="gacha-message">{animationRarity==="UR"?"ULTRA RARE!!":animationRarity==="SSR"?"SSR!!":animationRarity==="SR"?"SR!!":animationRarity==="R"?"R!":"N!"}</div>
+                </>}
               </div>
-              <div className="gacha-capsule"><span>✦</span></div>
-              {gachaStage==="tap"?<>
-                <div className="gacha-message">TAP!</div>
-                <div className="gacha-tap">画面をタップ</div>
-              </>:gachaStage==="charging"?<>
-                <div className="gacha-burst">✦ ✧ ✦</div>
-                <div className="gacha-message">ため中...</div>
-                <div className="gacha-tap">結果を待ってね</div>
-              </>:<>
-                <div className="gacha-burst">✦ ✧ ✦</div>
-                <div className="gacha-message">{animationRarity==="UR"?"ULTRA RARE!!":animationRarity==="SSR"?"SSR!!":animationRarity==="SR"?"SR!!":animationRarity==="R"?"R!":"N!"}</div>
-              </>}
             </div>
           </div>:null}
           {results.length>0?<div className={"card stack result-panel rarity-"+animationRarity.toLowerCase()}><h3>✨ RESULT</h3><div className="result-grid">{results.map((r,i)=><div className={"result-card reveal rarity-"+r.rarity.toLowerCase()} style={{animationDelay:(i*90)+"ms"}} key={r.result_position}><span className="rarity">{r.rarity}</span><strong>{r.prize_title}</strong><span className={r.is_duplicate?"dupe-badge":"new-badge"}>{r.is_duplicate?"重複 +"+r.sp_awarded+" SP":"NEW!"}</span></div>)}</div><p className="muted">残り 🎟 {ticketBalance}枚</p></div>:null}
