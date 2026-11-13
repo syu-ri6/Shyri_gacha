@@ -8,6 +8,7 @@ type RequestRow={user_id:string;reality_name:string;verification_status:string;v
 type HistoryRow={created_at:string;user_id:string;reality_name:string|null;ticket_count:number};
 type EventRow={id:string;title:string;status:string;prize_count:number;total_weight:number;created_at:string;published_at:string|null};
 type PrizeRow={id:string;title:string;rarity:string;weight:number;is_secret:boolean};
+type SpRate={rarity:string;sp_amount:number};
 
 export default function Admin(){
   const supabase=getSupabase();
@@ -22,6 +23,8 @@ export default function Admin(){
   const [rarity,setRarity]=useState("N");
   const [weight,setWeight]=useState("1");
   const [secret,setSecret]=useState(false);
+  const [spRates,setSpRates]=useState<SpRate[]>([]);
+  const [spDraft,setSpDraft]=useState<Record<string,string>>({});
   const [error,setError]=useState("");
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState<string|null>(null);
@@ -45,9 +48,17 @@ export default function Admin(){
   }
 
   async function loadPrizes(eventId:string|null){
-    if(!supabase||!eventId){setPrizes([]);return;}
-    const {data,error:e}=await supabase.rpc("shuri_admin_get_prizes",{target_event:eventId});
-    if(e)setError(e.message); else setPrizes((data??[]) as PrizeRow[]);
+    if(!supabase||!eventId){setPrizes([]);setSpRates([]);return;}
+    const [pr,sp]=await Promise.all([
+      supabase.rpc("shuri_admin_get_prizes",{target_event:eventId}),
+      supabase.rpc("shuri_admin_get_sp_rates",{target_event:eventId})
+    ]);
+    if(pr.error)setError(pr.error.message); else setPrizes((pr.data??[]) as PrizeRow[]);
+    if(sp.error)setError(sp.error.message); else {
+      const rates=(sp.data??[]) as SpRate[];
+      setSpRates(rates);
+      setSpDraft(Object.fromEntries(rates.map(r=>[r.rarity,String(r.sp_amount)])));
+    }
   }
 
   useEffect(()=>{load()},[supabase]);
@@ -97,6 +108,16 @@ export default function Admin(){
     setBusy(null);
   }
 
+  async function saveSpRate(rarity:string){
+    if(!supabase||!selected)return;
+    const amount=Number(spDraft[rarity]??0);
+    if(!Number.isInteger(amount)||amount<0)return setError("SPは0以上の整数にしてね");
+    setBusy("sp-"+rarity);setError("");
+    const {error:e}=await supabase.rpc("shuri_admin_set_sp_rate",{target_event:selected,target_rarity:rarity,new_amount:amount});
+    if(e)setError(e.message); else await loadPrizes(selected);
+    setBusy(null);
+  }
+
   async function setEventStatus(id:string,status:"active"|"paused"|"ended"){
     if(!supabase)return;
     setBusy("event-"+id);setError("");
@@ -140,6 +161,17 @@ export default function Admin(){
           {prizes.map(p=><div className="prize-admin" key={p.id}>
             <div><b>{p.rarity}</b> {p.is_secret?"🔒 ":""}{p.title}<div className="muted">確率 {Number(p.weight)}%</div></div>
             {current.status==="draft"?<button className="mini-danger" disabled={busy===p.id} onClick={()=>deletePrize(p.id)}>削除</button>:null}
+          </div>)}
+        </div>
+
+        <div className="divider"/>
+        <h3>重複時のSHURI POINT</h3>
+        <p className="muted">同じ景品が2回目以降に出たとき、レア度ごとにこのSPへ変換されます。</p>
+        <div className="sp-rate-grid">
+          {spRates.map(r=><div className="sp-rate-row" key={r.rarity}>
+            <strong>{r.rarity}</strong>
+            <input className="field" type="number" min="0" step="1" value={spDraft[r.rarity]??String(r.sp_amount)} onChange={e=>setSpDraft(v=>({...v,[r.rarity]:e.target.value}))}/>
+            <button className="btn secondary" disabled={busy==="sp-"+r.rarity} onClick={()=>saveSpRate(r.rarity)}>保存</button>
           </div>)}
         </div>
 
