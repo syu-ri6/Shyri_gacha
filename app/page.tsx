@@ -16,7 +16,12 @@ type GachaEvent={id:string;title:string;status:string;prize_count:number;total_w
 type GachaPrize={id:string;display_title:string;rarity:string;probability:number;is_secret:boolean};
 type DrawResult={
   draw_id:string;result_position:number;prize_id:string;prize_title:string;
-  rarity:string;is_secret:boolean;remaining_balance:number;
+  rarity:string;is_secret:boolean;is_duplicate:boolean;sp_awarded:number;
+  remaining_balance:number;remaining_sp:number;
+};
+type CollectionItem={
+  event_id:string;event_title:string;prize_id:string;prize_title:string;
+  rarity:string;is_secret:boolean;obtained_count:number;first_obtained_at:string;
 };
 
 function Main(){
@@ -27,6 +32,8 @@ function Main(){
   const [profile,setProfile]=useState<Profile|null>(null);
   const [name,setName]=useState("");
   const [ticketBalance,setTicketBalance]=useState(0);
+  const [spBalance,setSpBalance]=useState(0);
+  const [collection,setCollection]=useState<CollectionItem[]>([]);
   const [event,setEvent]=useState<GachaEvent|null>(null);
   const [prizes,setPrizes]=useState<GachaPrize[]>([]);
   const [results,setResults]=useState<DrawResult[]>([]);
@@ -40,16 +47,19 @@ function Main(){
 
   async function refreshCore(){
     if(!supabase)return;
-    const [pr,tickets]=await Promise.all([
+    const [pr,tickets,sp]=await Promise.all([
       supabase.rpc("shuri_get_my_profile"),
-      supabase.rpc("shuri_get_ticket_balance")
+      supabase.rpc("shuri_get_ticket_balance"),
+      supabase.rpc("shuri_get_active_sp_balance")
     ]);
     if(pr.error){setError(pr.error.message);return;}
     if(tickets.error){setError(tickets.error.message);return;}
+    if(sp.error){setError(sp.error.message);return;}
     const p=(pr.data?.[0]??null) as Profile|null;
     setProfile(p);
     setName(p?.reality_name??"");
     setTicketBalance(Number(tickets.data??0));
+    setSpBalance(Number(sp.data??0));
   }
 
   async function refreshGacha(){
@@ -82,6 +92,12 @@ function Main(){
 
   useEffect(()=>{
     if(user&&view==="gacha")refreshGacha();
+    if(user&&view==="collection"&&supabase){
+      supabase.rpc("shuri_get_collection").then(({data,error})=>{
+        if(error)setError(error.message);
+        else setCollection((data??[]) as CollectionItem[]);
+      });
+    }
   },[user,view]);
 
   async function signIn(){
@@ -165,7 +181,7 @@ function Main(){
     </>:<>
       {view==="home"?<>
         <div className="eyebrow">WELCOME BACK</div><h2>{profile?.reality_name||"しゅりなー"} さん 🐰</h2>
-        <div className="grid"><div className="stat"><div className="muted">🎟 SHURI TICKET</div><strong>{ticketBalance}</strong><span className="small"> 枚</span></div><div className="stat"><div className="muted">✨ SHURI POINT</div><strong>0</strong><span className="small"> SP</span></div></div>
+        <div className="grid"><div className="stat"><div className="muted">🎟 SHURI TICKET</div><strong>{ticketBalance}</strong><span className="small"> 枚</span></div><div className="stat"><div className="muted">✨ SHURI POINT</div><strong>{spBalance}</strong><span className="small"> SP</span></div></div>
         <div className="card stack"><strong>✅ Googleログイン済み</strong><p className="muted">本人確認：{statusLabel}</p><Link className="btn" href="/?view=profile">REALITY名・本人確認へ</Link></div>
         <div className="hero"><div className="eyebrow">SHURI GACHA</div><h1>LET'S<br/>DRAW!</h1><p>開催中のイベントはガチャページから。</p><Link className="btn secondary" href="/?view=gacha">ガチャへ →</Link></div>
       </>:view==="profile"?<>
@@ -200,10 +216,24 @@ function Main(){
               </>}
             </div>
           </div>:null}
-          {results.length>0?<div className={"card stack result-panel rarity-"+animationRarity.toLowerCase()}><h3>✨ RESULT</h3><div className="result-grid">{results.map((r,i)=><div className={"result-card reveal rarity-"+r.rarity.toLowerCase()} style={{animationDelay:(i*90)+"ms"}} key={r.result_position}><span className="rarity">{r.rarity}</span><strong>{r.prize_title}</strong></div>)}</div><p className="muted">残り 🎟 {ticketBalance}枚</p></div>:null}
+          {results.length>0?<div className={"card stack result-panel rarity-"+animationRarity.toLowerCase()}><h3>✨ RESULT</h3><div className="result-grid">{results.map((r,i)=><div className={"result-card reveal rarity-"+r.rarity.toLowerCase()} style={{animationDelay:(i*90)+"ms"}} key={r.result_position}><span className="rarity">{r.rarity}</span><strong>{r.prize_title}</strong><span className={r.is_duplicate?"dupe-badge":"new-badge"}>{r.is_duplicate?"重複 +"+r.sp_awarded+" SP":"NEW!"}</span></div>)}</div><p className="muted">残り 🎟 {ticketBalance}枚</p></div>:null}
           <div className="card stack"><h3>提供割合</h3>{prizes.map(p=><div className="prob-row" key={p.id}><span><b>{p.rarity}</b> {p.display_title}</span><span>{Number(p.probability).toFixed(2)}%</span></div>)}</div>
         </>}
-      </>:<div className="card stack"><h2>{view==="shop"?"SP SHOP 🛍️":"COLLECTION 🎧"}</h2><p className="muted">この機能は次の開発ステップでつなぎます。</p><Link href="/" className="btn secondary">ホームへ</Link></div>}
+      </>:view==="collection"?<>
+        <div className="row"><h2>COLLECTION 🎧</h2><strong>✨ {spBalance} SP</strong></div>
+        {collection.length===0?<div className="card"><p className="muted">まだ景品を獲得していません。ガチャを引くとここに集まるよ。</p></div>:<>
+          {[...new Set(collection.map(x=>x.event_title))].map(title=><div key={title}>
+            <h3 className="section-title">{title}</h3>
+            <div className="collection-grid">
+              {collection.filter(x=>x.event_title===title).map(x=><div className={"collection-card rarity-"+x.rarity.toLowerCase()} key={x.prize_id}>
+                <span className="rarity">{x.rarity}</span>
+                <strong>{x.prize_title}</strong>
+                <span className="muted">獲得 {x.obtained_count}回</span>
+              </div>)}
+            </div>
+          </div>)}
+        </>}
+      </>:<div className="card stack"><h2>SP SHOP 🛍️</h2><p className="muted">SP交換所は次のステップでつなぎます。</p><Link href="/" className="btn secondary">ホームへ</Link></div>}
     </>}
   </AppShell>;
 }
