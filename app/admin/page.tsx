@@ -128,74 +128,147 @@ export default function Admin(){
 
   const current=events.find(e=>e.id===selected)||null;
   const total=prizes.reduce((a,p)=>a+Number(p.weight),0);
+  const pendingCount=rows.filter(r=>r.verification_status==="pending").length;
+  const verifiedCount=rows.filter(r=>r.verification_status==="verified").length;
+  const activeEvent=events.find(e=>e.status==="active")||null;
+  const recentGranted=history.slice(0,20).reduce((sum,h)=>sum+Number(h.ticket_count||0),0);
 
   return <AppShell>
-    <div className="row"><h2>🔐 管理者画面</h2><Link href="/" className="muted">ホームへ</Link></div>
-    {error?<p className="notice danger">{error}</p>:null}
-    {loading?<p>読み込み中...</p>:<>
-      <h3 className="section-title">🎰 ガチャイベント</h3>
-      <div className="card stack">
-        <label>新しいイベント名</label>
-        <input className="field" value={eventTitle} maxLength={120} onChange={e=>setEventTitle(e.target.value)} placeholder="例：バースデーガチャ"/>
-        <button className="btn" disabled={busy==="event-new"||!eventTitle.trim()} onClick={createEvent}>イベントを作成</button>
+    <div className="admin-page">
+      <div className="admin-hero">
+        <div>
+          <div className="eyebrow">SHURI GACHA CONTROL</div>
+          <h2>🔐 管理者画面</h2>
+          <p className="muted">イベント・景品・本人確認・チケットをここでまとめて管理。</p>
+        </div>
+        <Link href="/" className="admin-home-link">ホームへ</Link>
       </div>
 
-      {events.length>0?<div className="event-tabs">{events.map(e=><button key={e.id} className={selected===e.id?"event-tab active":"event-tab"} onClick={()=>setSelected(e.id)}>{e.title}<small>{e.status}</small></button>)}</div>:null}
+      {error?<p className="notice danger">{error}</p>:null}
 
-      {current?<div className="card stack">
-        <div className="row"><div><h3 style={{margin:0}}>{current.title}</h3><span className="muted">状態：{current.status} / 景品 {current.prize_count}個</span></div><span className="tag">確率合計 {Number(current.total_weight)}%</span></div>
-        {current.status==="draft"?<>
-          <div className="divider"/>
-          <h3>景品を追加</h3>
-          <input className="field" value={prizeTitle} maxLength={120} onChange={e=>setPrizeTitle(e.target.value)} placeholder="景品名"/>
-          <div className="grid">
-            <select className="field" value={rarity} onChange={e=>setRarity(e.target.value)}>{["N","R","SR","SSR","UR"].map(r=><option key={r}>{r}</option>)}</select>
-            <input className="field" type="number" min="0.0001" step="0.1" max="100" value={weight} onChange={e=>setWeight(e.target.value)} placeholder="確率（%）"/>
+      {loading?<p>読み込み中...</p>:<>
+        <div className="admin-summary-grid">
+          <div className="admin-summary-card"><span>開催中</span><strong>{activeEvent?"1":"0"}</strong><small>{activeEvent?.title||"イベントなし"}</small></div>
+          <div className="admin-summary-card"><span>承認待ち</span><strong>{pendingCount}</strong><small>本人確認</small></div>
+          <div className="admin-summary-card"><span>確認済み</span><strong>{verifiedCount}</strong><small>ユーザー</small></div>
+          <div className="admin-summary-card"><span>直近配布</span><strong>{recentGranted}</strong><small>チケット</small></div>
+        </div>
+
+        <div className="admin-jumpbar">
+          <a href="#events">🎰 イベント</a>
+          <a href="#users">👤 ユーザー</a>
+          <a href="#history">🎟 履歴</a>
+        </div>
+
+        <section id="events" className="admin-section">
+          <div className="admin-section-head">
+            <div><div className="eyebrow">GACHA MANAGEMENT</div><h3>🎰 ガチャイベント</h3></div>
+            <span className="admin-count">{events.length}件</span>
           </div>
-          <label className="check-row"><input type="checkbox" checked={secret} onChange={e=>setSecret(e.target.checked)}/> シークレット景品（未獲得時は？？？表示）</label>
-          <button className="btn" disabled={busy==="prize-new"||!prizeTitle.trim()} onClick={addPrize}>＋ 景品を追加</button>
-        </>:<p className="notice">公開後は景品構成を変更できません。</p>}
 
-        <div className={Math.abs(total-100)<0.0001?"notice success":"notice"}>確率合計：{total.toFixed(2)}% {Math.abs(total-100)<0.0001?"✓":"（100%にすると公開できます）"}</div>
-        <div className="stack">
-          {prizes.map(p=><div className="prize-admin" key={p.id}>
-            <div><b>{p.rarity}</b> {p.is_secret?"🔒 ":""}{p.title}<div className="muted">確率 {Number(p.weight)}%</div></div>
-            {current.status==="draft"?<button className="mini-danger" disabled={busy===p.id} onClick={()=>deletePrize(p.id)}>削除</button>:null}
-          </div>)}
-        </div>
+          <div className="admin-panel">
+            <div className="admin-panel-head"><strong>新しいイベントを作成</strong><span className="muted">まずイベント名だけ作って、景品はあとから追加できます。</span></div>
+            <div className="admin-inline-form">
+              <input className="field" value={eventTitle} maxLength={120} onChange={e=>setEventTitle(e.target.value)} placeholder="例：バースデーガチャ"/>
+              <button className="btn" disabled={busy==="event-new"||!eventTitle.trim()} onClick={createEvent}>＋ 作成</button>
+            </div>
+          </div>
 
-        <div className="divider"/>
-        <h3>重複時のSHURI POINT</h3>
-        <p className="muted">同じ景品が2回目以降に出たとき、レア度ごとにこのSPへ変換されます。</p>
-        <div className="sp-rate-grid">
-          {spRates.map(r=><div className="sp-rate-row" key={r.rarity}>
-            <strong>{r.rarity}</strong>
-            <input className="field" type="number" min="0" step="1" value={spDraft[r.rarity]??String(r.sp_amount)} onChange={e=>setSpDraft(v=>({...v,[r.rarity]:e.target.value}))}/>
-            <button className="btn secondary" disabled={busy==="sp-"+r.rarity} onClick={()=>saveSpRate(r.rarity)}>保存</button>
-          </div>)}
-        </div>
+          {events.length>0?<div className="event-tabs admin-event-tabs">{events.map(e=><button key={e.id} className={selected===e.id?"event-tab active":"event-tab"} onClick={()=>setSelected(e.id)}><span>{e.title}</span><small className={"status-"+e.status}>{e.status}</small></button>)}</div>:null}
 
-        <div className="row">
-          {current.status==="draft"?<button className="btn" disabled={busy==="event-"+current.id||prizes.length===0||Math.abs(total-100)>0.0001} onClick={()=>setEventStatus(current.id,"active")}>🚀 公開して開始</button>:null}
-          {current.status==="active"?<><button className="btn secondary" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"paused")}>⏸ 一時停止</button><button className="btn secondary" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"ended")}>終了</button></>:null}
-          {current.status==="paused"?<><button className="btn" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"active")}>▶ 再開</button><button className="btn secondary" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"ended")}>終了</button></>:null}
-        </div>
-      </div>:null}
+          {current?<div className="admin-event-card">
+            <div className="admin-event-top">
+              <div>
+                <div className="eyebrow">SELECTED EVENT</div>
+                <h3>{current.title}</h3>
+                <div className="admin-meta-row">
+                  <span className={"admin-status status-"+current.status}>{current.status}</span>
+                  <span>景品 {current.prize_count}個</span>
+                  <span>確率 {Number(current.total_weight)}%</span>
+                </div>
+              </div>
+              <div className={Math.abs(total-100)<0.0001?"prob-total ok":"prob-total"}>
+                <small>確率合計</small><strong>{total.toFixed(2)}%</strong>
+              </div>
+            </div>
 
-      <h3 className="section-title">👤 本人確認・チケット配布</h3>
-      {rows.length===0?<div className="card"><p className="muted">ユーザーはまだいません。</p></div>:rows.map(r=><div className="card stack" key={r.user_id}>
-        <strong>{r.reality_name||"名前未登録"}</strong>
-        <span className="muted">状態：{r.verification_status==="pending"?"⏳ 承認待ち":r.verification_status==="verified"?"✅ 確認済み":"❌ 却下"}</span>
-        {r.verification_status==="pending"?<div className="row"><button className="btn" disabled={busy===r.user_id} onClick={()=>setStatus(r.user_id,"verified")}>承認</button><button className="btn secondary" disabled={busy===r.user_id} onClick={()=>setStatus(r.user_id,"rejected")}>却下</button></div>:null}
-        {r.verification_status==="verified"?<div className="stack">
-          <div className="ticket-presets">{[1,2,3,4,5,6,7,8,9].map(n=><button key={n} className="btn secondary" disabled={busy===r.user_id} onClick={()=>setCounts(v=>({...v,[r.user_id]:String(n)}))}>{n}枚</button>)}<button className="btn secondary" disabled={busy===r.user_id} onClick={()=>setCounts(v=>({...v,[r.user_id]:"10"}))}>10枚セット</button></div>
-          <input className="field" type="number" min="1" step="1" value={counts[r.user_id]||"1"} onChange={e=>setCounts(v=>({...v,[r.user_id]:e.target.value}))}/>
-          <button className="btn" disabled={busy===r.user_id} onClick={()=>grant(r.user_id)}>🎟 チケットを配布</button>
-        </div>:null}
-      </div>)}
+            {current.status==="draft"?<div className="admin-subpanel">
+              <div className="admin-subpanel-title"><strong>景品を追加</strong><span className="muted">公開前だけ編集できます</span></div>
+              <input className="field" value={prizeTitle} maxLength={120} onChange={e=>setPrizeTitle(e.target.value)} placeholder="景品名"/>
+              <div className="admin-form-grid">
+                <label><span>レア度</span><select className="field" value={rarity} onChange={e=>setRarity(e.target.value)}>{["N","R","SR","SSR","UR"].map(r=><option key={r}>{r}</option>)}</select></label>
+                <label><span>確率（%）</span><input className="field" type="number" min="0.0001" step="0.1" max="100" value={weight} onChange={e=>setWeight(e.target.value)} placeholder="確率（%）"/></label>
+              </div>
+              <label className="check-row admin-check"><input type="checkbox" checked={secret} onChange={e=>setSecret(e.target.checked)}/> シークレット景品（未獲得時は？？？表示）</label>
+              <button className="btn block" disabled={busy==="prize-new"||!prizeTitle.trim()} onClick={addPrize}>＋ 景品を追加</button>
+            </div>:<p className="notice">公開後は景品構成を変更できません。</p>}
 
-      <h3 className="section-title">配布履歴</h3>
-      {history.length===0?<div className="card"><p className="muted">まだ配布履歴はありません。</p></div>:history.map((h,i)=><div className="card row" key={h.created_at+"-"+i}><div><strong>{h.reality_name||"名前未登録"}</strong><div className="muted">{new Date(h.created_at).toLocaleString("ja-JP")}</div></div><strong>+{h.ticket_count}枚</strong></div>)}
-    </>}
+            <div className="admin-prize-list">
+              <div className="admin-subpanel-title"><strong>景品一覧</strong><span className="muted">{prizes.length}個</span></div>
+              {prizes.length===0?<div className="admin-empty">まだ景品がありません。</div>:prizes.map(p=><div className="prize-admin admin-prize-row" key={p.id}>
+                <div className="admin-prize-main">
+                  <span className={"rarity-pill rarity-"+p.rarity.toLowerCase()}>{p.rarity}</span>
+                  <div><strong>{p.is_secret?"🔒 ":""}{p.title}</strong><div className="muted">確率 {Number(p.weight)}%</div></div>
+                </div>
+                {current.status==="draft"?<button className="mini-danger" disabled={busy===p.id} onClick={()=>deletePrize(p.id)}>削除</button>:null}
+              </div>)}
+            </div>
+
+            <div className="admin-subpanel">
+              <div className="admin-subpanel-title"><strong>重複時のSHURI POINT</strong><span className="muted">レア度ごとの変換量</span></div>
+              <div className="sp-rate-grid admin-sp-grid">
+                {spRates.map(r=><div className="sp-rate-row" key={r.rarity}>
+                  <strong className={"rarity-pill rarity-"+r.rarity.toLowerCase()}>{r.rarity}</strong>
+                  <input className="field" type="number" min="0" step="1" value={spDraft[r.rarity]??String(r.sp_amount)} onChange={e=>setSpDraft(v=>({...v,[r.rarity]:e.target.value}))}/>
+                  <button className="btn secondary" disabled={busy==="sp-"+r.rarity} onClick={()=>saveSpRate(r.rarity)}>保存</button>
+                </div>)}
+              </div>
+            </div>
+
+            <div className="admin-event-actions">
+              {current.status==="draft"?<button className="btn" disabled={busy==="event-"+current.id||prizes.length===0||Math.abs(total-100)>0.0001} onClick={()=>setEventStatus(current.id,"active")}>🚀 公開して開始</button>:null}
+              {current.status==="active"?<><button className="btn secondary" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"paused")}>⏸ 一時停止</button><button className="btn secondary" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"ended")}>終了</button></>:null}
+              {current.status==="paused"?<><button className="btn" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"active")}>▶ 再開</button><button className="btn secondary" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"ended")}>終了</button></>:null}
+            </div>
+            {current.status==="draft"&&Math.abs(total-100)>0.0001?<div className="admin-helper">確率合計を100%にすると公開できます。</div>:null}
+          </div>:null}
+        </section>
+
+        <section id="users" className="admin-section">
+          <div className="admin-section-head">
+            <div><div className="eyebrow">USER MANAGEMENT</div><h3>👤 本人確認・チケット配布</h3></div>
+            <span className="admin-count">{rows.length}人</span>
+          </div>
+
+          {rows.length===0?<div className="admin-panel"><p className="muted">ユーザーはまだいません。</p></div>:<div className="admin-user-list">
+            {rows.map(r=><div className="admin-user-card" key={r.user_id}>
+              <div className="admin-user-head">
+                <div><strong>{r.reality_name||"名前未登録"}</strong><span className={"admin-status status-"+r.verification_status}>{r.verification_status==="pending"?"承認待ち":r.verification_status==="verified"?"確認済み":"却下"}</span></div>
+              </div>
+              {r.verification_status==="pending"?<div className="admin-two-actions"><button className="btn" disabled={busy===r.user_id} onClick={()=>setStatus(r.user_id,"verified")}>承認</button><button className="btn secondary" disabled={busy===r.user_id} onClick={()=>setStatus(r.user_id,"rejected")}>却下</button></div>:null}
+              {r.verification_status==="verified"?<div className="admin-ticket-box">
+                <div className="muted">配布枚数を選択</div>
+                <div className="ticket-presets">{[1,2,3,4,5,6,7,8,9].map(n=><button key={n} className={(counts[r.user_id]||"1")===String(n)?"btn preset-active":"btn secondary"} disabled={busy===r.user_id} onClick={()=>setCounts(v=>({...v,[r.user_id]:String(n)}))}>{n}</button>)}<button className={(counts[r.user_id]||"1")==="10"?"btn preset-active":"btn secondary"} disabled={busy===r.user_id} onClick={()=>setCounts(v=>({...v,[r.user_id]:"10"}))}>10</button></div>
+                <div className="admin-ticket-send"><input className="field" type="number" min="1" step="1" value={counts[r.user_id]||"1"} onChange={e=>setCounts(v=>({...v,[r.user_id]:e.target.value}))}/><button className="btn" disabled={busy===r.user_id} onClick={()=>grant(r.user_id)}>🎟 配布</button></div>
+              </div>:null}
+            </div>)}
+          </div>}
+        </section>
+
+        <section id="history" className="admin-section">
+          <div className="admin-section-head">
+            <div><div className="eyebrow">TICKET HISTORY</div><h3>🎟 配布履歴</h3></div>
+            <span className="admin-count">{history.length}件</span>
+          </div>
+          <div className="admin-panel admin-history-panel">
+            {history.length===0?<p className="muted">まだ配布履歴はありません。</p>:history.map((h,i)=><div className="admin-history-row" key={h.created_at+"-"+i}>
+              <div><strong>{h.reality_name||"名前未登録"}</strong><div className="muted">{new Date(h.created_at).toLocaleString("ja-JP")}</div></div>
+              <strong className="ticket-plus">+{h.ticket_count}</strong>
+            </div>)}
+          </div>
+        </section>
+      </>}
+    </div>
   </AppShell>;
+
 }
