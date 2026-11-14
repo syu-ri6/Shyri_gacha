@@ -288,18 +288,31 @@ function Main(){
                   <div className="gacha-tap">画面をタップ</div>
                 </div>:<div className="gacha-copy gacha-copy-empty" aria-hidden="true"/>}
                 {pendingResults.length===10?<button className="gacha-skip-btn" onClick={skipTenReveal}>SKIP</button>:null}
-              </>:gachaStage==="summary"?<div className="ten-result-sheet" onClick={closeTenSummary}>
+              </>:gachaStage==="summary"?<div className="ten-result-sheet ten-strip-sheet" onClick={closeTenSummary}>
                 <div className="ten-result-head">
-                  <div><div className="eyebrow">10 PULL RESULT</div><h3>10連結果 🎴</h3></div>
+                  <div>
+                    <div className="eyebrow">10 PULL RESULT</div>
+                    <h3>10連結果 🎴</h3>
+                    <div className="ten-result-stats">
+                      <span>NEW {pendingResults.filter(r=>!r.is_duplicate).length}</span>
+                      <span>SR以上 {pendingResults.filter(r=>(rarityRank[r.rarity]||0)>=3).length}</span>
+                    </div>
+                  </div>
                   <span className="gacha-close-hint">タップで閉じる</span>
                 </div>
-                <div className="ten-card-grid">
-                  {pendingResults.map((r,i)=><div className={"ten-result-card rarity-"+r.rarity.toLowerCase()} key={r.result_position}>
+                <div className="ten-card-grid ten-strip-grid">
+                  {pendingResults.map((r,i)=><div className={"ten-result-card ten-strip-card rarity-"+r.rarity.toLowerCase()} key={r.result_position}>
+                    {!r.is_duplicate?<span className="ten-new-label">NEW</span>:null}
                     <span className="ten-card-number">{i+1}</span>
-                    <div className="ten-card-rarity">{r.rarity}</div>
-                    <div className="ten-card-art">🐰</div>
-                    <strong>{r.prize_title}</strong>
-                    <span className={r.is_duplicate?"dupe-badge":"new-badge"}>{r.is_duplicate?"+"+r.sp_awarded+" SP":"NEW!"}</span>
+                    <div className="ten-card-art ten-strip-art">🐰</div>
+                    <div className="ten-strip-gradient"/>
+                    <div className="ten-strip-info">
+                      <strong>{r.prize_title}</strong>
+                      <div className="ten-strip-bottom">
+                        <span className="ten-card-rarity">{r.rarity}</span>
+                        {r.is_duplicate?<span className="ten-sp-small">+{r.sp_awarded}SP</span>:null}
+                      </div>
+                    </div>
                   </div>)}
                 </div>
               </div>:revealCard?<div className="gacha-reveal-wrap" onClick={advanceReveal}>
