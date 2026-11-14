@@ -2,273 +2,64 @@
 import {useEffect,useState} from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
+import AdminNav from "@/components/AdminNav";
 import {getSupabase} from "@/lib/supabase";
 
-type RequestRow={user_id:string;reality_name:string;verification_status:string;verification_requested_at:string|null};
-type HistoryRow={created_at:string;user_id:string;reality_name:string|null;ticket_count:number};
-type EventRow={id:string;title:string;status:string;prize_count:number;total_weight:number;created_at:string;published_at:string|null};
-type PrizeRow={id:string;title:string;rarity:string;weight:number;is_secret:boolean};
-type SpRate={rarity:string;sp_amount:number};
+type RequestRow={verification_status:string};
+type EventRow={id:string;title:string;status:string};
+type HistoryRow={ticket_count:number};
 
 export default function Admin(){
   const supabase=getSupabase();
-  const [rows,setRows]=useState<RequestRow[]>([]);
-  const [history,setHistory]=useState<HistoryRow[]>([]);
-  const [events,setEvents]=useState<EventRow[]>([]);
-  const [selected,setSelected]=useState<string|null>(null);
-  const [prizes,setPrizes]=useState<PrizeRow[]>([]);
-  const [counts,setCounts]=useState<Record<string,string>>({});
-  const [eventTitle,setEventTitle]=useState("");
-  const [prizeTitle,setPrizeTitle]=useState("");
-  const [rarity,setRarity]=useState("N");
-  const [weight,setWeight]=useState("1");
-  const [secret,setSecret]=useState(false);
-  const [spRates,setSpRates]=useState<SpRate[]>([]);
-  const [spDraft,setSpDraft]=useState<Record<string,string>>({});
+  const [pending,setPending]=useState(0);
+  const [verified,setVerified]=useState(0);
+  const [activeTitle,setActiveTitle]=useState("");
+  const [recentGranted,setRecentGranted]=useState(0);
   const [error,setError]=useState("");
   const [loading,setLoading]=useState(true);
-  const [busy,setBusy]=useState<string|null>(null);
 
-  async function load(){
+  useEffect(()=>{(async()=>{
     if(!supabase){setError("Supabase is not configured");setLoading(false);return;}
-    setError("");
-    const [requests,tickets,eventList]=await Promise.all([
+    const [requests,events,history]=await Promise.all([
       supabase.rpc("shuri_admin_list_pending"),
-      supabase.rpc("shuri_admin_ticket_history"),
-      supabase.rpc("shuri_admin_list_events")
+      supabase.rpc("shuri_admin_list_events"),
+      supabase.rpc("shuri_admin_ticket_history")
     ]);
-    if(requests.error)setError(requests.error.message); else setRows((requests.data??[]) as RequestRow[]);
-    if(tickets.error)setError(tickets.error.message); else setHistory((tickets.data??[]) as HistoryRow[]);
-    if(eventList.error)setError(eventList.error.message); else {
-      const list=(eventList.data??[]) as EventRow[];
-      setEvents(list);
-      if(!selected&&list.length)setSelected(list[0].id);
+    if(requests.error)setError(requests.error.message);
+    else{
+      const rows=(requests.data??[]) as RequestRow[];
+      setPending(rows.filter(r=>r.verification_status==="pending").length);
+      setVerified(rows.filter(r=>r.verification_status==="verified").length);
     }
+    if(events.error)setError(events.error.message);
+    else{
+      const active=((events.data??[]) as EventRow[]).find(e=>e.status==="active");
+      setActiveTitle(active?.title??"");
+    }
+    if(history.error)setError(history.error.message);
+    else setRecentGranted(((history.data??[]) as HistoryRow[]).slice(0,20).reduce((s,h)=>s+Number(h.ticket_count||0),0));
     setLoading(false);
-  }
-
-  async function loadPrizes(eventId:string|null){
-    if(!supabase||!eventId){setPrizes([]);setSpRates([]);return;}
-    const [pr,sp]=await Promise.all([
-      supabase.rpc("shuri_admin_get_prizes",{target_event:eventId}),
-      supabase.rpc("shuri_admin_get_sp_rates",{target_event:eventId})
-    ]);
-    if(pr.error)setError(pr.error.message); else setPrizes((pr.data??[]) as PrizeRow[]);
-    if(sp.error)setError(sp.error.message); else {
-      const rates=(sp.data??[]) as SpRate[];
-      setSpRates(rates);
-      setSpDraft(Object.fromEntries(rates.map(r=>[r.rarity,String(r.sp_amount)])));
-    }
-  }
-
-  useEffect(()=>{load()},[supabase]);
-  useEffect(()=>{loadPrizes(selected)},[selected]);
-
-  async function setStatus(userId:string,status:"verified"|"rejected"){
-    if(!supabase)return;
-    setBusy(userId);setError("");
-    const {error:e}=await supabase.rpc("shuri_admin_set_verification",{target_user:userId,new_status:status});
-    if(e)setError(e.message); else await load();
-    setBusy(null);
-  }
-
-  async function grant(userId:string){
-    if(!supabase)return;
-    const count=Number(counts[userId]||1);
-    if(!Number.isInteger(count)||count<1)return setError("チケット枚数は1以上の整数にしてね");
-    setBusy(userId);setError("");
-    const {error:e}=await supabase.rpc("shuri_admin_grant_tickets",{target_user:userId,ticket_count:count});
-    if(e)setError(e.message); else {setCounts(v=>({...v,[userId]:"1"}));await load();}
-    setBusy(null);
-  }
-
-  async function createEvent(){
-    if(!supabase||!eventTitle.trim())return;
-    setBusy("event-new");setError("");
-    const {data,error:e}=await supabase.rpc("shuri_admin_create_event",{event_title:eventTitle.trim()});
-    if(e)setError(e.message); else {setEventTitle("");setSelected(data as string);await load();}
-    setBusy(null);
-  }
-
-  async function addPrize(){
-    if(!supabase||!selected||!prizeTitle.trim())return;
-    const w=Number(weight);
-    if(!Number.isFinite(w)||w<=0)return setError("確率は0より大きい数字にしてね");
-    setBusy("prize-new");setError("");
-    const {error:e}=await supabase.rpc("shuri_admin_add_prize",{target_event:selected,prize_title:prizeTitle.trim(),prize_rarity:rarity,prize_weight:w,secret_prize:secret});
-    if(e)setError(e.message); else {setPrizeTitle("");setWeight("1");setSecret(false);await Promise.all([load(),loadPrizes(selected)]);}
-    setBusy(null);
-  }
-
-  async function deletePrize(id:string){
-    if(!supabase||!selected)return;
-    setBusy(id);setError("");
-    const {error:e}=await supabase.rpc("shuri_admin_delete_prize",{target_prize:id});
-    if(e)setError(e.message); else await Promise.all([load(),loadPrizes(selected)]);
-    setBusy(null);
-  }
-
-  async function saveSpRate(rarity:string){
-    if(!supabase||!selected)return;
-    const amount=Number(spDraft[rarity]??0);
-    if(!Number.isInteger(amount)||amount<0)return setError("SPは0以上の整数にしてね");
-    setBusy("sp-"+rarity);setError("");
-    const {error:e}=await supabase.rpc("shuri_admin_set_sp_rate",{target_event:selected,target_rarity:rarity,new_amount:amount});
-    if(e)setError(e.message); else await loadPrizes(selected);
-    setBusy(null);
-  }
-
-  async function setEventStatus(id:string,status:"active"|"paused"|"ended"){
-    if(!supabase)return;
-    setBusy("event-"+id);setError("");
-    const {error:e}=await supabase.rpc("shuri_admin_set_event_status",{target_event:id,new_status:status});
-    if(e)setError(e.message); else await load();
-    setBusy(null);
-  }
-
-  const current=events.find(e=>e.id===selected)||null;
-  const total=prizes.reduce((a,p)=>a+Number(p.weight),0);
-  const pendingCount=rows.filter(r=>r.verification_status==="pending").length;
-  const verifiedCount=rows.filter(r=>r.verification_status==="verified").length;
-  const activeEvent=events.find(e=>e.status==="active")||null;
-  const recentGranted=history.slice(0,20).reduce((sum,h)=>sum+Number(h.ticket_count||0),0);
+  })()},[supabase]);
 
   return <AppShell>
     <div className="admin-page">
-      <div className="admin-hero">
-        <div>
-          <div className="eyebrow">SHURI GACHA CONTROL</div>
-          <h2>🔐 管理者画面</h2>
-          <p className="muted">イベント・景品・本人確認・チケットをここでまとめて管理。</p>
-        </div>
-        <Link href="/" className="admin-home-link">ホームへ</Link>
-      </div>
-
+      <div className="admin-hero"><div><div className="eyebrow">SHURI GACHA CONTROL</div><h2>🔐 管理者画面</h2><p className="muted">やりたい作業を選んで管理。</p></div><Link href="/" className="admin-home-link">ホームへ</Link></div>
+      <AdminNav/>
       {error?<p className="notice danger">{error}</p>:null}
-
       {loading?<p>読み込み中...</p>:<>
         <div className="admin-summary-grid">
-          <div className="admin-summary-card"><span>開催中</span><strong>{activeEvent?"1":"0"}</strong><small>{activeEvent?.title||"イベントなし"}</small></div>
-          <div className="admin-summary-card"><span>承認待ち</span><strong>{pendingCount}</strong><small>本人確認</small></div>
-          <div className="admin-summary-card"><span>確認済み</span><strong>{verifiedCount}</strong><small>ユーザー</small></div>
+          <div className="admin-summary-card"><span>開催中</span><strong>{activeTitle?"1":"0"}</strong><small>{activeTitle||"イベントなし"}</small></div>
+          <div className="admin-summary-card"><span>承認待ち</span><strong>{pending}</strong><small>本人確認</small></div>
+          <div className="admin-summary-card"><span>確認済み</span><strong>{verified}</strong><small>ユーザー</small></div>
           <div className="admin-summary-card"><span>直近配布</span><strong>{recentGranted}</strong><small>チケット</small></div>
         </div>
-
-        <div className="admin-jumpbar">
-          <a href="#events">🎰 イベント</a>
-          <a href="#users">👤 ユーザー</a>
-          <a href="#history">🎟 履歴</a>
+        <div className="admin-menu-grid">
+          <Link href="/admin/events" className="admin-menu-card"><span>🎰</span><strong>イベント管理</strong><small>景品・確率・SP・公開設定</small></Link>
+          <Link href="/admin/verification" className="admin-menu-card"><span>👤</span><strong>本人確認</strong><small>承認待ちをまとめて確認</small></Link>
+          <Link href="/admin/tickets" className="admin-menu-card"><span>🎟</span><strong>チケット配布</strong><small>ユーザーにすぐ配布</small></Link>
+          <Link href="/admin/history" className="admin-menu-card"><span>🧾</span><strong>配布履歴</strong><small>いつ・誰に・何枚</small></Link>
         </div>
-
-        <section id="events" className="admin-section">
-          <div className="admin-section-head">
-            <div><div className="eyebrow">GACHA MANAGEMENT</div><h3>🎰 ガチャイベント</h3></div>
-            <span className="admin-count">{events.length}件</span>
-          </div>
-
-          <div className="admin-panel">
-            <div className="admin-panel-head"><strong>新しいイベントを作成</strong><span className="muted">まずイベント名だけ作って、景品はあとから追加できます。</span></div>
-            <div className="admin-inline-form">
-              <input className="field" value={eventTitle} maxLength={120} onChange={e=>setEventTitle(e.target.value)} placeholder="例：バースデーガチャ"/>
-              <button className="btn" disabled={busy==="event-new"||!eventTitle.trim()} onClick={createEvent}>＋ 作成</button>
-            </div>
-          </div>
-
-          {events.length>0?<div className="event-tabs admin-event-tabs">{events.map(e=><button key={e.id} className={selected===e.id?"event-tab active":"event-tab"} onClick={()=>setSelected(e.id)}><span>{e.title}</span><small className={"status-"+e.status}>{e.status}</small></button>)}</div>:null}
-
-          {current?<div className="admin-event-card">
-            <div className="admin-event-top">
-              <div>
-                <div className="eyebrow">SELECTED EVENT</div>
-                <h3>{current.title}</h3>
-                <div className="admin-meta-row">
-                  <span className={"admin-status status-"+current.status}>{current.status}</span>
-                  <span>景品 {current.prize_count}個</span>
-                  <span>確率 {Number(current.total_weight)}%</span>
-                </div>
-              </div>
-              <div className={Math.abs(total-100)<0.0001?"prob-total ok":"prob-total"}>
-                <small>確率合計</small><strong>{total.toFixed(2)}%</strong>
-              </div>
-            </div>
-
-            {current.status==="draft"?<div className="admin-subpanel">
-              <div className="admin-subpanel-title"><strong>景品を追加</strong><span className="muted">公開前だけ編集できます</span></div>
-              <input className="field" value={prizeTitle} maxLength={120} onChange={e=>setPrizeTitle(e.target.value)} placeholder="景品名"/>
-              <div className="admin-form-grid">
-                <label><span>レア度</span><select className="field" value={rarity} onChange={e=>setRarity(e.target.value)}>{["N","R","SR","SSR","UR"].map(r=><option key={r}>{r}</option>)}</select></label>
-                <label><span>確率（%）</span><input className="field" type="number" min="0.0001" step="0.1" max="100" value={weight} onChange={e=>setWeight(e.target.value)} placeholder="確率（%）"/></label>
-              </div>
-              <label className="check-row admin-check"><input type="checkbox" checked={secret} onChange={e=>setSecret(e.target.checked)}/> シークレット景品（未獲得時は？？？表示）</label>
-              <button className="btn block" disabled={busy==="prize-new"||!prizeTitle.trim()} onClick={addPrize}>＋ 景品を追加</button>
-            </div>:<p className="notice">公開後は景品構成を変更できません。</p>}
-
-            <div className="admin-prize-list">
-              <div className="admin-subpanel-title"><strong>景品一覧</strong><span className="muted">{prizes.length}個</span></div>
-              {prizes.length===0?<div className="admin-empty">まだ景品がありません。</div>:prizes.map(p=><div className="prize-admin admin-prize-row" key={p.id}>
-                <div className="admin-prize-main">
-                  <span className={"rarity-pill rarity-"+p.rarity.toLowerCase()}>{p.rarity}</span>
-                  <div><strong>{p.is_secret?"🔒 ":""}{p.title}</strong><div className="muted">確率 {Number(p.weight)}%</div></div>
-                </div>
-                {current.status==="draft"?<button className="mini-danger" disabled={busy===p.id} onClick={()=>deletePrize(p.id)}>削除</button>:null}
-              </div>)}
-            </div>
-
-            <div className="admin-subpanel">
-              <div className="admin-subpanel-title"><strong>重複時のSHURI POINT</strong><span className="muted">レア度ごとの変換量</span></div>
-              <div className="sp-rate-grid admin-sp-grid">
-                {spRates.map(r=><div className="sp-rate-row" key={r.rarity}>
-                  <strong className={"rarity-pill rarity-"+r.rarity.toLowerCase()}>{r.rarity}</strong>
-                  <input className="field" type="number" min="0" step="1" value={spDraft[r.rarity]??String(r.sp_amount)} onChange={e=>setSpDraft(v=>({...v,[r.rarity]:e.target.value}))}/>
-                  <button className="btn secondary" disabled={busy==="sp-"+r.rarity} onClick={()=>saveSpRate(r.rarity)}>保存</button>
-                </div>)}
-              </div>
-            </div>
-
-            <div className="admin-event-actions">
-              {current.status==="draft"?<button className="btn" disabled={busy==="event-"+current.id||prizes.length===0||Math.abs(total-100)>0.0001} onClick={()=>setEventStatus(current.id,"active")}>🚀 公開して開始</button>:null}
-              {current.status==="active"?<><button className="btn secondary" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"paused")}>⏸ 一時停止</button><button className="btn secondary" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"ended")}>終了</button></>:null}
-              {current.status==="paused"?<><button className="btn" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"active")}>▶ 再開</button><button className="btn secondary" disabled={busy==="event-"+current.id} onClick={()=>setEventStatus(current.id,"ended")}>終了</button></>:null}
-            </div>
-            {current.status==="draft"&&Math.abs(total-100)>0.0001?<div className="admin-helper">確率合計を100%にすると公開できます。</div>:null}
-          </div>:null}
-        </section>
-
-        <section id="users" className="admin-section">
-          <div className="admin-section-head">
-            <div><div className="eyebrow">USER MANAGEMENT</div><h3>👤 本人確認・チケット配布</h3></div>
-            <span className="admin-count">{rows.length}人</span>
-          </div>
-
-          {rows.length===0?<div className="admin-panel"><p className="muted">ユーザーはまだいません。</p></div>:<div className="admin-user-list">
-            {rows.map(r=><div className="admin-user-card" key={r.user_id}>
-              <div className="admin-user-head">
-                <div><strong>{r.reality_name||"名前未登録"}</strong><span className={"admin-status status-"+r.verification_status}>{r.verification_status==="pending"?"承認待ち":r.verification_status==="verified"?"確認済み":"却下"}</span></div>
-              </div>
-              {r.verification_status==="pending"?<div className="admin-two-actions"><button className="btn" disabled={busy===r.user_id} onClick={()=>setStatus(r.user_id,"verified")}>承認</button><button className="btn secondary" disabled={busy===r.user_id} onClick={()=>setStatus(r.user_id,"rejected")}>却下</button></div>:null}
-              {r.verification_status==="verified"?<div className="admin-ticket-box">
-                <div className="muted">配布枚数を選択</div>
-                <div className="ticket-presets">{[1,2,3,4,5,6,7,8,9].map(n=><button key={n} className={(counts[r.user_id]||"1")===String(n)?"btn preset-active":"btn secondary"} disabled={busy===r.user_id} onClick={()=>setCounts(v=>({...v,[r.user_id]:String(n)}))}>{n}</button>)}<button className={(counts[r.user_id]||"1")==="10"?"btn preset-active":"btn secondary"} disabled={busy===r.user_id} onClick={()=>setCounts(v=>({...v,[r.user_id]:"10"}))}>10</button></div>
-                <div className="admin-ticket-send"><input className="field" type="number" min="1" step="1" value={counts[r.user_id]||"1"} onChange={e=>setCounts(v=>({...v,[r.user_id]:e.target.value}))}/><button className="btn" disabled={busy===r.user_id} onClick={()=>grant(r.user_id)}>🎟 配布</button></div>
-              </div>:null}
-            </div>)}
-          </div>}
-        </section>
-
-        <section id="history" className="admin-section">
-          <div className="admin-section-head">
-            <div><div className="eyebrow">TICKET HISTORY</div><h3>🎟 配布履歴</h3></div>
-            <span className="admin-count">{history.length}件</span>
-          </div>
-          <div className="admin-panel admin-history-panel">
-            {history.length===0?<p className="muted">まだ配布履歴はありません。</p>:history.map((h,i)=><div className="admin-history-row" key={h.created_at+"-"+i}>
-              <div><strong>{h.reality_name||"名前未登録"}</strong><div className="muted">{new Date(h.created_at).toLocaleString("ja-JP")}</div></div>
-              <strong className="ticket-plus">+{h.ticket_count}</strong>
-            </div>)}
-          </div>
-        </section>
       </>}
     </div>
   </AppShell>;
-
 }
