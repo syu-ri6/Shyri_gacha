@@ -41,6 +41,8 @@ function Main(){
   const [animating,setAnimating]=useState(false);
   const [gachaStage,setGachaStage]=useState<"idle"|"tap"|"charging"|"reveal">("idle");
   const [animationRarity,setAnimationRarity]=useState("N");
+  const [revealIndex,setRevealIndex]=useState(0);
+  const [skipTen,setSkipTen]=useState(false);
   const [ready,setReady]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
@@ -125,7 +127,7 @@ function Main(){
 
   async function draw(count:1|10){
     if(!supabase)return;
-    setBusy(true);setError("");setResults([]);setPendingResults([]);
+    setBusy(true);setError("");setResults([]);setPendingResults([]);setRevealIndex(0);setSkipTen(false);
     const key=crypto.randomUUID();
     const {data,error:e}=await supabase.rpc("shuri_draw_gacha",{pull_count:count,request_key:key});
     if(e){
@@ -142,6 +144,8 @@ function Main(){
       setPendingResults(rows);
       setAnimating(true);
       setGachaStage("tap");
+      setRevealIndex(0);
+      setSkipTen(false);
       setTicketBalance(Number(rows[0].remaining_balance));
     }else{
       setBusy(false);
@@ -167,7 +171,30 @@ function Main(){
 
   const statusLabel=profile?.verification_status==="verified"?"✅ 確認済み":profile?.verification_status==="pending"?"⏳ 承認待ち":profile?.verification_status==="rejected"?"❌ 再確認が必要":"未確認";
   const rarityRank:Record<string,number>={N:1,R:2,SR:3,SSR:4,UR:5};
-  const revealCard=pendingResults.length?pendingResults.reduce((a,b)=>(rarityRank[b.rarity]||0)>(rarityRank[a.rarity]||0)?b:a,pendingResults[0]):null;
+  const bestRevealCard=pendingResults.length?pendingResults.reduce((a,b)=>(rarityRank[b.rarity]||0)>(rarityRank[a.rarity]||0)?b:a,pendingResults[0]):null;
+  const revealCard=pendingResults.length===10&&!skipTen?(pendingResults[revealIndex]??pendingResults[0]):bestRevealCard;
+
+  function closeReveal(){
+    setAnimating(false);
+    setPendingResults([]);
+    setGachaStage("idle");
+    setBusy(false);
+    setRevealIndex(0);
+    setSkipTen(false);
+  }
+
+  function advanceReveal(e:React.MouseEvent){
+    e.stopPropagation();
+    if(pendingResults.length!==10||skipTen){closeReveal();return;}
+    if(revealIndex<9){setRevealIndex(i=>i+1);return;}
+    closeReveal();
+  }
+
+  function skipTenReveal(e:React.MouseEvent){
+    e.stopPropagation();
+    setSkipTen(true);
+    setRevealIndex(0);
+  }
 
   return <AppShell>
     {!supabase?<div className="notice">🔧 Supabase接続設定が未完了です。</div>:null}
@@ -232,7 +259,7 @@ function Main(){
                   <div className="gacha-message">TAP!</div>
                   <div className="gacha-tap">画面をタップ</div>
                 </div>:<div className="gacha-copy gacha-copy-empty" aria-hidden="true"/>}
-              </>:revealCard?<div className="gacha-reveal-wrap" onClick={(e)=>{e.stopPropagation();setAnimating(false);setPendingResults([]);setGachaStage("idle");setBusy(false);}}>
+              </>:revealCard?<div className="gacha-reveal-wrap" onClick={advanceReveal}>
 
                 <div className="gacha-burst">✦ ✧ ✦</div>
                 <div className={"gacha-prize-card rarity-"+revealCard.rarity.toLowerCase()}>
@@ -244,8 +271,9 @@ function Main(){
                     {revealCard.is_duplicate?"重複 +"+revealCard.sp_awarded+" SP":"NEW!"}
                   </div>
                 </div>
-                <div className="gacha-reveal-caption">{pendingResults.length>1?"最高レアのカード":"GET!"}</div>
-                <div className="gacha-close-hint">タップで閉じる</div>
+                <div className="gacha-reveal-caption">{pendingResults.length===10&&!skipTen?((revealIndex+1)+" / 10"):pendingResults.length>1?"BEST CARD":"GET!"}</div>
+                {pendingResults.length===10&&!skipTen?<button className="gacha-skip-btn" onClick={skipTenReveal}>SKIP</button>:null}
+                <div className="gacha-close-hint">{pendingResults.length===10&&!skipTen?(revealIndex<9?"タップで次のカード":"タップで10枚一覧へ"):"タップで10枚一覧へ"}</div>
               </div>:null}
             </div>
           </div>:null}
