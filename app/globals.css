@@ -147,3 +147,16 @@ radial-gradient(circle at 50% 32%,#ffffff55,#d7a8e022 34%,transparent 58%);font-
 .collection-large-info{position:absolute;left:0;right:0;bottom:0;padding:20px 18px;background:linear-gradient(180deg,transparent,#0a0610e8 38%,#09060d 100%);display:grid;gap:7px}
 .collection-large-info h3{margin:0;font-size:24px;line-height:1.15}
 @media(max-width:390px){.collection-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.collection-thumb{padding:6px}.collection-thumb .collection-card-art{height:92px}}
+
+/* Collection: large horizontal card shelf */
+.collection-grid{display:flex!important;gap:12px!important;overflow-x:auto;padding:4px 2px 10px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.collection-grid::-webkit-scrollbar{display:none}
+.collection-thumb{flex:0 0 min(42vw,180px);scroll-snap-align:start;padding:8px}
+.collection-thumb .collection-card-art{height:190px!important;font-size:64px}
+.collection-thumb strong{font-size:13px;line-height:1.25;-webkit-line-clamp:2}
+.collection-thumb .muted{font-size:10px}
+.collection-rarity-section{margin-bottom:24px}
+@media(max-width:390px){
+  .collection-thumb{flex-basis:46vw}
+  .collection-thumb .collection-card-art{height:175px!important}
+}
