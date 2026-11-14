@@ -347,6 +347,7 @@ function Main(){
                     </div>
                   </div>)}
                 </div>
+                <button className="btn block ten-share-btn" onClick={(e)=>{e.stopPropagation();shareResultsToX();}}>𝕏 10連結果をシェア</button>
               </div>:revealCard?<div className="gacha-reveal-wrap" onClick={advanceReveal}>
                 <div className="gacha-burst">✦ ✧ ✦</div>
                 <div className={"gacha-prize-card rarity-"+revealCard.rarity.toLowerCase()}>
