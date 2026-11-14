@@ -345,13 +345,24 @@ function Main(){
         {collection.length===0?<div className="card"><p className="muted">まだ景品を獲得していません。ガチャを引くとここに集まるよ。</p></div>:<>
           {[...new Set(collection.map(x=>x.event_title))].map(title=><div key={title}>
             <h3 className="section-title">{title}</h3>
-            <div className="collection-grid">
-              {collection.filter(x=>x.event_title===title).map(x=><div className={"collection-card rarity-"+x.rarity.toLowerCase()} key={x.prize_id}>
-                <span className="rarity">{x.rarity}</span>
-                <strong>{x.prize_title}</strong>
-                <span className="muted">獲得 {x.obtained_count}回</span>
-              </div>)}
-            </div>
+            {["N","R","SR","SSR","UR"].map(rarityName=>{
+              const items=collection.filter(x=>x.event_title===title&&x.rarity===rarityName);
+              if(items.length===0)return null;
+              return <div className="collection-rarity-section" key={rarityName}>
+                <div className="collection-rarity-head">
+                  <span className={"rarity-pill rarity-"+rarityName.toLowerCase()}>{rarityName}</span>
+                  <span className="muted">{items.length}種</span>
+                </div>
+                <div className="collection-grid">
+                  {items.map(x=><div className={"collection-card rarity-"+x.rarity.toLowerCase()} key={x.prize_id}>
+                    <span className="rarity">{x.rarity}</span>
+                    <div className="collection-card-art">🐰</div>
+                    <strong>{x.prize_title}</strong>
+                    <span className="muted">獲得 {x.obtained_count}回</span>
+                  </div>)}
+                </div>
+              </div>
+            })}
           </div>)}
         </>}
       </>:<div className="card stack"><h2>SP SHOP 🛍️</h2><p className="muted">SP交換所は次のステップでつなぎます。</p><Link href="/" className="btn secondary">ホームへ</Link></div>}
