@@ -33,3 +33,6 @@
 .gacha-prize-card.rarity-ur:before{content:"";position:absolute;inset:-30%;background:conic-gradient(#ff8fd7,#8ba7ff,#7ff0e6,#fff19a,#ff9a85,#ff8fd7);opacity:.18;animation:spinFast 2s linear infinite}
 .gacha-prize-card>*{position:relative;z-index:1}
 @keyframes cardShine{0%{transform:translateX(-75%) rotate(8deg);opacity:0}30%{opacity:1}100%{transform:translateX(75%) rotate(8deg);opacity:0}}
+
+.gacha-copy-empty{min-height:92px;margin-top:14px}
+.gacha-close-hint{margin-top:2px;font-size:12px;letter-spacing:1.4px;color:#eadff1;opacity:.85}
