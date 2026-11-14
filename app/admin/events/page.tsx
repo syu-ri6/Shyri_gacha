@@ -5,7 +5,7 @@ import AdminNav from "@/components/AdminNav";
 import {getSupabase} from "@/lib/supabase";
 
 type EventRow={id:string;title:string;status:string;prize_count:number;total_weight:number;created_at:string;published_at:string|null};
-type PrizeRow={id:string;title:string;rarity:string;weight:number;is_secret:boolean};
+type PrizeRow={id:string;title:string;rarity:string;weight:number;is_secret:boolean;card_image_url:string|null;download_url:string|null;download_kind:"audio"|"image"|"video"|"file"|null};
 type SpRate={rarity:string;sp_amount:number};
 
 export default function AdminEvents(){
@@ -15,6 +15,7 @@ export default function AdminEvents(){
   const [prizes,setPrizes]=useState<PrizeRow[]>([]);
   const [spRates,setSpRates]=useState<SpRate[]>([]);
   const [spDraft,setSpDraft]=useState<Record<string,string>>({});
+  const [mediaDraft,setMediaDraft]=useState<Record<string,{card:string;download:string;kind:string}>>({});
   const [eventTitle,setEventTitle]=useState("");
   const [prizeTitle,setPrizeTitle]=useState("");
   const [rarity,setRarity]=useState("N");
@@ -37,10 +38,14 @@ export default function AdminEvents(){
   async function loadPrizes(id:string|null){
     if(!supabase||!id){setPrizes([]);setSpRates([]);return;}
     const [p,s]=await Promise.all([
-      supabase.rpc("shuri_admin_get_prizes",{target_event:id}),
+      supabase.rpc("shuri_admin_get_prizes_v2",{target_event:id}),
       supabase.rpc("shuri_admin_get_sp_rates",{target_event:id})
     ]);
-    if(p.error)setError(p.error.message);else setPrizes((p.data??[]) as PrizeRow[]);
+    if(p.error)setError(p.error.message);else{
+      const list=(p.data??[]) as PrizeRow[];
+      setPrizes(list);
+      setMediaDraft(Object.fromEntries(list.map(x=>[x.id,{card:x.card_image_url??"",download:x.download_url??"",kind:x.download_kind??"file"}])));
+    }
     if(s.error)setError(s.error.message);else{
       const rates=(s.data??[]) as SpRate[];setSpRates(rates);setSpDraft(Object.fromEntries(rates.map(x=>[x.rarity,String(x.sp_amount)])));
     }
@@ -53,6 +58,14 @@ export default function AdminEvents(){
   async function deletePrize(id:string){if(!supabase||!selected)return;setBusy(id);const {error}=await supabase.rpc("shuri_admin_delete_prize",{target_prize:id});if(error)setError(error.message);else await Promise.all([load(),loadPrizes(selected)]);setBusy(null)}
   async function saveSpRate(r:string){if(!supabase||!selected)return;const amount=Number(spDraft[r]??0);if(!Number.isInteger(amount)||amount<0){setError("SPは0以上の整数にしてね");return;}setBusy("sp-"+r);const {error}=await supabase.rpc("shuri_admin_set_sp_rate",{target_event:selected,target_rarity:r,new_amount:amount});if(error)setError(error.message);else await loadPrizes(selected);setBusy(null)}
   async function setStatus(id:string,status:"active"|"paused"|"ended"){if(!supabase)return;setBusy("event-"+id);const {error}=await supabase.rpc("shuri_admin_set_event_status",{target_event:id,new_status:status});if(error)setError(error.message);else await load();setBusy(null)}
+  async function saveMedia(id:string){
+    if(!supabase)return;
+    const m=mediaDraft[id]??{card:"",download:"",kind:"file"};
+    setBusy("media-"+id);setError("");
+    const {error}=await supabase.rpc("shuri_admin_set_prize_media",{target_prize:id,new_card_image_url:m.card||null,new_download_url:m.download||null,new_download_kind:m.download?m.kind:null});
+    if(error)setError(error.message);else await loadPrizes(selected);
+    setBusy(null);
+  }
 
   const current=events.find(e=>e.id===selected)||null;
   const total=prizes.reduce((a,p)=>a+Number(p.weight),0);
@@ -70,7 +83,16 @@ export default function AdminEvents(){
       {current?<div className="admin-event-card">
         <div className="admin-event-top"><div><div className="eyebrow">SELECTED EVENT</div><h3>{current.title}</h3><div className="admin-meta-row"><span className={"admin-status status-"+current.status}>{current.status}</span><span>景品 {current.prize_count}個</span></div></div><div className={Math.abs(total-100)<.0001?"prob-total ok":"prob-total"}><small>確率合計</small><strong>{total.toFixed(2)}%</strong></div></div>
         {current.status==="draft"?<div className="admin-subpanel"><div className="admin-subpanel-title"><strong>景品を追加</strong><span className="muted">公開前のみ編集可</span></div><input className="field" value={prizeTitle} onChange={e=>setPrizeTitle(e.target.value)} placeholder="景品名"/><div className="admin-form-grid"><label><span>レア度</span><select className="field" value={rarity} onChange={e=>setRarity(e.target.value)}>{["N","R","SR","SSR","UR"].map(r=><option key={r}>{r}</option>)}</select></label><label><span>確率（%）</span><input className="field" type="number" value={weight} onChange={e=>setWeight(e.target.value)}/></label></div><label className="check-row admin-check"><input type="checkbox" checked={secret} onChange={e=>setSecret(e.target.checked)}/>シークレット景品</label><button className="btn block" onClick={addPrize} disabled={busy==="prize"||!prizeTitle.trim()}>＋ 景品を追加</button></div>:<p className="notice">公開後は景品構成を変更できません。</p>}
-        <div className="admin-prize-list"><div className="admin-subpanel-title"><strong>景品一覧</strong><span className="muted">{prizes.length}個</span></div>{prizes.map(p=><div className="prize-admin admin-prize-row" key={p.id}><div className="admin-prize-main"><span className={"rarity-pill rarity-"+p.rarity.toLowerCase()}>{p.rarity}</span><div><strong>{p.is_secret?"🔒 ":""}{p.title}</strong><div className="muted">確率 {Number(p.weight)}%</div></div></div>{current.status==="draft"?<button className="mini-danger" onClick={()=>deletePrize(p.id)} disabled={busy===p.id}>削除</button>:null}</div>)}</div>
+        <div className="admin-prize-list"><div className="admin-subpanel-title"><strong>景品一覧</strong><span className="muted">{prizes.length}個</span></div>{prizes.map(p=><div className="admin-prize-media-card" key={p.id}>
+          <div className="prize-admin admin-prize-row"><div className="admin-prize-main"><span className={"rarity-pill rarity-"+p.rarity.toLowerCase()}>{p.rarity}</span><div><strong>{p.is_secret?"🔒 ":""}{p.title}</strong><div className="muted">確率 {Number(p.weight)}%</div></div></div>{current.status==="draft"?<button className="mini-danger" onClick={()=>deletePrize(p.id)} disabled={busy===p.id}>削除</button>:null}</div>
+          <details className="admin-media-details">
+            <summary>🖼🎧 カード画像・音源を設定</summary>
+            <label>カード画像URL<input className="field" value={mediaDraft[p.id]?.card??""} onChange={e=>setMediaDraft(v=>({...v,[p.id]:{...(v[p.id]??{card:"",download:"",kind:"file"}),card:e.target.value}}))} placeholder="https://..."/></label>
+            <label>ダウンロード素材URL<input className="field" value={mediaDraft[p.id]?.download??""} onChange={e=>setMediaDraft(v=>({...v,[p.id]:{...(v[p.id]??{card:"",download:"",kind:"file"}),download:e.target.value}}))} placeholder="音源・画像・ファイルのURL"/></label>
+            <label>素材タイプ<select className="field" value={mediaDraft[p.id]?.kind??"file"} onChange={e=>setMediaDraft(v=>({...v,[p.id]:{...(v[p.id]??{card:"",download:"",kind:"file"}),kind:e.target.value}}))}><option value="audio">音源 / ボイス</option><option value="image">画像</option><option value="video">動画</option><option value="file">その他ファイル</option></select></label>
+            <button className="btn block" disabled={busy==="media-"+p.id} onClick={()=>saveMedia(p.id)}>素材設定を保存</button>
+          </details>
+        </div>)}</div>
         <div className="admin-subpanel"><div className="admin-subpanel-title"><strong>重複時SHURI POINT</strong><span className="muted">レア度ごとの変換量</span></div><div className="sp-rate-grid admin-sp-grid">{spRates.map(r=><div className="sp-rate-row" key={r.rarity}><strong className={"rarity-pill rarity-"+r.rarity.toLowerCase()}>{r.rarity}</strong><input className="field" type="number" value={spDraft[r.rarity]??String(r.sp_amount)} onChange={e=>setSpDraft(v=>({...v,[r.rarity]:e.target.value}))}/><button className="btn secondary" onClick={()=>saveSpRate(r.rarity)} disabled={busy==="sp-"+r.rarity}>保存</button></div>)}</div></div>
         <div className="admin-event-actions">{current.status==="draft"?<button className="btn" disabled={busy==="event-"+current.id||prizes.length===0||Math.abs(total-100)>.0001} onClick={()=>setStatus(current.id,"active")}>🚀 公開して開始</button>:null}{current.status==="active"?<><button className="btn secondary" onClick={()=>setStatus(current.id,"paused")}>⏸ 一時停止</button><button className="btn secondary" onClick={()=>setStatus(current.id,"ended")}>終了</button></>:null}{current.status==="paused"?<><button className="btn" onClick={()=>setStatus(current.id,"active")}>▶ 再開</button><button className="btn secondary" onClick={()=>setStatus(current.id,"ended")}>終了</button></>:null}</div>
       </div>:null}
