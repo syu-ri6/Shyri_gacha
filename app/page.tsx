@@ -34,6 +34,7 @@ function Main(){
   const [ticketBalance,setTicketBalance]=useState(0);
   const [spBalance,setSpBalance]=useState(0);
   const [collection,setCollection]=useState<CollectionItem[]>([]);
+  const [selectedCollection,setSelectedCollection]=useState<CollectionItem|null>(null);
   const [event,setEvent]=useState<GachaEvent|null>(null);
   const [prizes,setPrizes]=useState<GachaPrize[]>([]);
   const [results,setResults]=useState<DrawResult[]>([]);
@@ -354,17 +355,32 @@ function Main(){
                   <span className="muted">{items.length}種</span>
                 </div>
                 <div className="collection-grid">
-                  {items.map(x=><div className={"collection-card rarity-"+x.rarity.toLowerCase()} key={x.prize_id}>
+                  {items.map(x=><button type="button" className={"collection-card collection-thumb rarity-"+x.rarity.toLowerCase()} key={x.prize_id} onClick={()=>setSelectedCollection(x)}>
                     <span className="rarity">{x.rarity}</span>
                     <div className="collection-card-art">🐰</div>
                     <strong>{x.prize_title}</strong>
                     <span className="muted">獲得 {x.obtained_count}回</span>
-                  </div>)}
+                  </button>)}
                 </div>
               </div>
             })}
           </div>)}
         </>}
+        {selectedCollection?<div className="collection-modal" onClick={()=>setSelectedCollection(null)}>
+          <div className="collection-modal-backdrop"/>
+          <div className="collection-modal-card" onClick={e=>e.stopPropagation()}>
+            <button type="button" className="collection-modal-close" onClick={()=>setSelectedCollection(null)}>×</button>
+            <div className={"collection-large-card rarity-"+selectedCollection.rarity.toLowerCase()}>
+              <div className="collection-large-art">🐰</div>
+              <div className="collection-large-info">
+                <span className={"rarity-pill rarity-"+selectedCollection.rarity.toLowerCase()}>{selectedCollection.rarity}</span>
+                <h3>{selectedCollection.prize_title}</h3>
+                <span className="muted">獲得 {selectedCollection.obtained_count}回</span>
+              </div>
+            </div>
+            <div className="gacha-close-hint">外側をタップして閉じる</div>
+          </div>
+        </div>:null}
       </>:<div className="card stack"><h2>SP SHOP 🛍️</h2><p className="muted">SP交換所は次のステップでつなぎます。</p><Link href="/" className="btn secondary">ホームへ</Link></div>}
     </>}
   </AppShell>;
