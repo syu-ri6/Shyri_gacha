@@ -22,6 +22,7 @@ type DrawResult={
 type CollectionItem={
   event_id:string;event_title:string;prize_id:string;prize_title:string;
   rarity:string;is_secret:boolean;obtained_count:number;first_obtained_at:string;
+  card_image_url:string|null;download_url:string|null;download_kind:"audio"|"image"|"video"|"file"|null;
 };
 
 function Main(){
@@ -96,7 +97,7 @@ function Main(){
   useEffect(()=>{
     if(user&&view==="gacha")refreshGacha();
     if(user&&view==="collection"&&supabase){
-      supabase.rpc("shuri_get_collection").then(({data,error})=>{
+      supabase.rpc("shuri_get_collection_v2").then(({data,error})=>{
         if(error)setError(error.message);
         else setCollection((data??[]) as CollectionItem[]);
       });
@@ -171,6 +172,36 @@ function Main(){
     if(!supabase)return;
     const {error:e}=await supabase.auth.signOut();
     if(e)setError(e.message);
+  }
+
+  async function downloadOwned(url:string|null,filename:string){
+    if(!url)return;
+    try{
+      const res=await fetch(url);
+      if(!res.ok)throw new Error("download failed");
+      const blob=await res.blob();
+      const objectUrl=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=objectUrl;
+      a.download=filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    }catch{
+      window.open(url,"_blank","noopener,noreferrer");
+    }
+  }
+
+  function shareResultsToX(){
+    if(results.length===0)return;
+    const rank:Record<string,number>={N:1,R:2,SR:3,SSR:4,UR:5};
+    const best=results.reduce((a,b)=>(rank[b.rarity]||0)>(rank[a.rarity]||0)?b:a,results[0]);
+    const text=results.length===10
+      ? "SHURI GACHA 10連結果🎰\n最高レア："+best.rarity+" "+best.prize_title+"\n#SHURIGACHA"
+      : "SHURI GACHAで "+best.rarity+"「"+best.prize_title+"」をGET🎴\n#SHURIGACHA";
+    const url=window.location.origin+"/?view=gacha";
+    window.open("https://x.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(url),"_blank","noopener,noreferrer");
   }
 
   const statusLabel=profile?.verification_status==="verified"?"✅ 確認済み":profile?.verification_status==="pending"?"⏳ 承認待ち":profile?.verification_status==="rejected"?"❌ 再確認が必要":"未確認";
@@ -333,7 +364,7 @@ function Main(){
               </div>:null}
             </div>
           </div>:null}
-          {results.length>0?<div className={"card stack result-panel rarity-"+animationRarity.toLowerCase()}><h3>✨ RESULT</h3><div className="result-grid">{results.map((r,i)=><div className={"result-card reveal rarity-"+r.rarity.toLowerCase()} style={{animationDelay:(i*90)+"ms"}} key={r.result_position}><span className="rarity">{r.rarity}</span><strong>{r.prize_title}</strong><span className={r.is_duplicate?"dupe-badge":"new-badge"}>{r.is_duplicate?"重複 +"+r.sp_awarded+" SP":"NEW!"}</span></div>)}</div><p className="muted">残り 🎟 {ticketBalance}枚</p></div>:null}
+          {results.length>0?<div className={"card stack result-panel rarity-"+animationRarity.toLowerCase()}><div className="row"><h3>✨ RESULT</h3><button className="btn secondary share-x-btn" onClick={shareResultsToX}>𝕏 結果をシェア</button></div><div className="result-grid">{results.map((r,i)=><div className={"result-card reveal rarity-"+r.rarity.toLowerCase()} style={{animationDelay:(i*90)+"ms"}} key={r.result_position}><span className="rarity">{r.rarity}</span><strong>{r.prize_title}</strong><span className={r.is_duplicate?"dupe-badge":"new-badge"}>{r.is_duplicate?"重複 +"+r.sp_awarded+" SP":"NEW!"}</span></div>)}</div><p className="muted">残り 🎟 {ticketBalance}枚</p></div>:null}
           <details className="card odds-card">
             <summary>提供割合を見る</summary>
             <div className="odds-list">
@@ -357,7 +388,7 @@ function Main(){
                 <div className="collection-grid">
                   {items.map(x=><button type="button" className={"collection-card collection-thumb rarity-"+x.rarity.toLowerCase()} key={x.prize_id} onClick={()=>setSelectedCollection(x)}>
                     <span className="rarity">{x.rarity}</span>
-                    <div className="collection-card-art">🐰</div>
+                    <div className="collection-card-art">{x.card_image_url?<img src={x.card_image_url} alt={x.prize_title}/>:<span>🐰</span>}</div>
                     <strong>{x.prize_title}</strong>
                     <span className="muted">獲得 {x.obtained_count}回</span>
                   </button>)}
@@ -366,17 +397,30 @@ function Main(){
             })}
           </div>)}
         </>}
+        {collection.some(x=>x.download_url)?<div className="collection-downloads">
+          <div className="row"><h3>DOWNLOADS 🎧</h3><span className="muted">獲得済み</span></div>
+          <div className="collection-download-list">
+            {collection.filter(x=>x.download_url).map(x=><div className="collection-download-row" key={x.prize_id}>
+              <div><strong>{x.prize_title}</strong><div className="muted">{x.download_kind==="audio"?"音源 / ボイス":x.download_kind==="image"?"画像":x.download_kind==="video"?"動画":"ファイル"}</div></div>
+              <button className="btn secondary" onClick={()=>downloadOwned(x.download_url,x.prize_title)}>保存</button>
+            </div>)}
+          </div>
+        </div>:null}
         {selectedCollection?<div className="collection-modal" onClick={()=>setSelectedCollection(null)}>
           <div className="collection-modal-backdrop"/>
           <div className="collection-modal-card" onClick={e=>e.stopPropagation()}>
             <button type="button" className="collection-modal-close" onClick={()=>setSelectedCollection(null)}>×</button>
             <div className={"collection-large-card rarity-"+selectedCollection.rarity.toLowerCase()}>
-              <div className="collection-large-art">🐰</div>
+              <div className="collection-large-art">{selectedCollection.card_image_url?<img src={selectedCollection.card_image_url} alt={selectedCollection.prize_title}/>:<span>🐰</span>}</div>
               <div className="collection-large-info">
                 <span className={"rarity-pill rarity-"+selectedCollection.rarity.toLowerCase()}>{selectedCollection.rarity}</span>
                 <h3>{selectedCollection.prize_title}</h3>
                 <span className="muted">獲得 {selectedCollection.obtained_count}回</span>
               </div>
+            </div>
+            <div className="collection-modal-actions">
+              <button className="btn" disabled={!selectedCollection.card_image_url} onClick={()=>downloadOwned(selectedCollection.card_image_url,selectedCollection.prize_title+".png")}>🖼 カードを保存</button>
+              {selectedCollection.download_url?<button className="btn secondary" onClick={()=>downloadOwned(selectedCollection.download_url,selectedCollection.prize_title)}>⬇ 素材を保存</button>:null}
             </div>
             <div className="gacha-close-hint">外側をタップして閉じる</div>
           </div>
