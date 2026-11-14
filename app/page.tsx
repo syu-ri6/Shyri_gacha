@@ -151,16 +151,11 @@ function Main(){
   function handleGachaTap(){
     if(gachaStage!=="tap")return;
     setGachaStage("charging");
-    const ms=animationRarity==="UR"?2800:animationRarity==="SSR"?2200:animationRarity==="SR"?1600:animationRarity==="R"?1000:700;
+    const ms=animationRarity==="UR"?2600:animationRarity==="SSR"?1900:animationRarity==="SR"?1300:animationRarity==="R"?800:400;
     window.setTimeout(()=>{
       setGachaStage("reveal");
       setResults(pendingResults);
-      window.setTimeout(()=>{
-        setAnimating(false);
-        setPendingResults([]);
-        setGachaStage("idle");
-        setBusy(false);
-      },1800);
+      window.setTimeout(()=>{},1800);
     },ms);
   }
 
@@ -233,16 +228,12 @@ function Main(){
               {gachaStage!=="reveal"?<>
                 <img className="gacha-machine-art" src="/assets/shuri-gacha-machine.svg?v=2" alt="SHURI GACHA machine"/>
                 <img className="gacha-capsule-art" src="/assets/shuri-capsule.svg?v=3" alt="gacha capsule"/>
-                <div className="gacha-copy">
-                  {gachaStage==="tap"?<>
-                    <div className="gacha-message">TAP!</div>
-                    <div className="gacha-tap">画面をタップ</div>
-                  </>:<>
-                    <div className="gacha-message">ため中...</div>
-                    <div className="gacha-tap">結果を待ってね</div>
-                  </>}
-                </div>
-              </>:revealCard?<div className="gacha-reveal-wrap">
+                {gachaStage==="tap"?<div className="gacha-copy">
+                  <div className="gacha-message">TAP!</div>
+                  <div className="gacha-tap">画面をタップ</div>
+                </div>:<div className="gacha-copy gacha-copy-empty" aria-hidden="true"/>}
+              </>:revealCard?<div className="gacha-reveal-wrap" onClick={(e)=>{e.stopPropagation();setAnimating(false);setPendingResults([]);setGachaStage("idle");setBusy(false);}}>
+
                 <div className="gacha-burst">✦ ✧ ✦</div>
                 <div className={"gacha-prize-card rarity-"+revealCard.rarity.toLowerCase()}>
                   <div className="gacha-card-shine"/>
@@ -254,6 +245,7 @@ function Main(){
                   </div>
                 </div>
                 <div className="gacha-reveal-caption">{pendingResults.length>1?"最高レアのカード":"GET!"}</div>
+                <div className="gacha-close-hint">タップで閉じる</div>
               </div>:null}
             </div>
           </div>:null}
