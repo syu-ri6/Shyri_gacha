@@ -38,3 +38,6 @@
 
 .gacha-copy-empty{min-height:92px;margin-top:14px}
 .gacha-close-hint{margin-top:2px;font-size:12px;letter-spacing:1.4px;color:#eadff1;opacity:.85}
+
+.gacha-skip-btn{position:absolute;top:max(22px,env(safe-area-inset-top));right:18px;z-index:8;border:1px solid #ffffff4a;background:#1c1027cc;color:#fff;border-radius:999px;padding:9px 15px;font-size:12px;font-weight:900;letter-spacing:1.2px;backdrop-filter:blur(10px)}
+.gacha-skip-btn:active{transform:scale(.96)}
