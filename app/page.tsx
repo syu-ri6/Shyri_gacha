@@ -228,8 +228,8 @@ function Main(){
             <div className="gacha-backdrop"/>
             <div className="gacha-rays"/>
             <div className="gacha-stage">
-              <img className="gacha-machine-art" src="/assets/shuri-gacha-machine.svg" alt="SHURI GACHA machine"/>
-              <img className="gacha-capsule-art" src="/assets/shuri-capsule.svg" alt="gacha capsule"/>
+              <img className="gacha-machine-art" src="/assets/shuri-gacha-machine.svg?v=2" alt="SHURI GACHA machine"/>
+              <img className="gacha-capsule-art" src="/assets/shuri-capsule.svg?v=2" alt="gacha capsule"/>
               <div className="gacha-copy">
                 {gachaStage==="tap"?<>
                   <div className="gacha-message">TAP!</div>
