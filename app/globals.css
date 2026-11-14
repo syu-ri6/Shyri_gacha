@@ -173,3 +173,30 @@ radial-gradient(circle at 50% 32%,#ffffff55,#d7a8e022 34%,transparent 58%);font-
   .collection-thumb{padding:5px!important}
   .collection-thumb strong{font-size:9px!important}
 }
+
+.collection-card-art img,
+.collection-large-art img{width:100%;height:100%;object-fit:cover;display:block}
+.collection-large-art img{position:absolute;inset:0}
+.collection-modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;width:min(78vw,330px)}
+.collection-modal-actions .btn{min-height:44px}
+.collection-downloads{display:grid;gap:10px;margin:24px 0}
+.collection-downloads h3{margin:0}
+.collection-download-list{display:grid;gap:8px}
+.collection-download-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;border:1px solid #40304a;border-radius:14px;background:#1c1327}
+.collection-download-row>div{min-width:0}
+.collection-download-row strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.share-x-btn{padding:9px 12px;font-size:11px}
+.ten-share-btn{margin-top:12px}
+.admin-prize-media-card{display:grid;gap:6px}
+.admin-media-details{border:1px solid #3b2c46;border-radius:12px;background:#16101f;overflow:hidden}
+.admin-media-details summary{cursor:pointer;list-style:none;padding:11px 12px;font-size:11px;font-weight:900;color:#d9c6e4}
+.admin-media-details summary::-webkit-details-marker{display:none}
+.admin-media-details summary:after{content:"＋";float:right;color:#c89cda}
+.admin-media-details[open] summary:after{content:"−"}
+.admin-media-details[open]{padding-bottom:12px}
+.admin-media-details label{display:block;padding:0 12px;font-size:10px;color:#c7b3d0}
+.admin-media-details .field{margin:5px 0 10px}
+.admin-media-details .btn{width:calc(100% - 24px);margin:0 12px}
+@media(max-width:390px){
+  .collection-modal-actions{grid-template-columns:1fr}
+}
