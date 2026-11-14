@@ -39,7 +39,7 @@ function Main(){
   const [results,setResults]=useState<DrawResult[]>([]);
   const [pendingResults,setPendingResults]=useState<DrawResult[]>([]);
   const [animating,setAnimating]=useState(false);
-  const [gachaStage,setGachaStage]=useState<"idle"|"tap"|"charging"|"reveal">("idle");
+  const [gachaStage,setGachaStage]=useState<"idle"|"tap"|"charging"|"reveal"|"summary">("idle");
   const [animationRarity,setAnimationRarity]=useState("N");
   const [revealIndex,setRevealIndex]=useState(0);
   const [skipTen,setSkipTen]=useState(false);
@@ -138,9 +138,7 @@ function Main(){
 
     const rows=(data??[]) as DrawResult[];
     if(rows.length){
-      const rank:Record<string,number>={N:1,R:2,SR:3,SSR:4,UR:5};
-      const best=rows.reduce((a,b)=>(rank[b.rarity]||0)>(rank[a.rarity]||0)?b:a,rows[0]);
-      setAnimationRarity(best.rarity);
+      setAnimationRarity(rows[0].rarity);
       setPendingResults(rows);
       setAnimating(true);
       setGachaStage("tap");
@@ -152,15 +150,20 @@ function Main(){
     }
   }
 
+  function chargeMs(rarity:string){
+    return rarity==="UR"?2600:rarity==="SSR"?1900:rarity==="SR"?1300:rarity==="R"?800:400;
+  }
+
+  function beginChargeFor(card:DrawResult){
+    setAnimationRarity(card.rarity);
+    setGachaStage("charging");
+    window.setTimeout(()=>setGachaStage("reveal"),chargeMs(card.rarity));
+  }
+
   function handleGachaTap(){
     if(gachaStage!=="tap")return;
-    setGachaStage("charging");
-    const ms=animationRarity==="UR"?2600:animationRarity==="SSR"?1900:animationRarity==="SR"?1300:animationRarity==="R"?800:400;
-    window.setTimeout(()=>{
-      setGachaStage("reveal");
-      setResults(pendingResults);
-      window.setTimeout(()=>{},1800);
-    },ms);
+    const first=pendingResults[0];
+    if(first)beginChargeFor(first);
   }
 
   async function signOut(){
@@ -175,6 +178,7 @@ function Main(){
   const revealCard=pendingResults.length===10&&!skipTen?(pendingResults[revealIndex]??pendingResults[0]):bestRevealCard;
 
   function closeReveal(){
+    if(pendingResults.length===1)setResults(pendingResults);
     setAnimating(false);
     setPendingResults([]);
     setGachaStage("idle");
@@ -183,17 +187,41 @@ function Main(){
     setSkipTen(false);
   }
 
+  function showTenSummary(){
+    setResults(pendingResults);
+    setGachaStage("summary");
+  }
+
   function advanceReveal(e:React.MouseEvent){
     e.stopPropagation();
-    if(pendingResults.length!==10||skipTen){closeReveal();return;}
-    if(revealIndex<9){setRevealIndex(i=>i+1);return;}
-    closeReveal();
+    if(pendingResults.length!==10){closeReveal();return;}
+    if(skipTen){showTenSummary();return;}
+    if(revealIndex<9){
+      const nextIndex=revealIndex+1;
+      setRevealIndex(nextIndex);
+      beginChargeFor(pendingResults[nextIndex]);
+      return;
+    }
+    showTenSummary();
   }
 
   function skipTenReveal(e:React.MouseEvent){
     e.stopPropagation();
+    if(pendingResults.length!==10)return;
+    const best=pendingResults.reduce((a,b)=>(rarityRank[b.rarity]||0)>(rarityRank[a.rarity]||0)?b:a,pendingResults[0]);
     setSkipTen(true);
+    setAnimationRarity(best.rarity);
+    setGachaStage("reveal");
+  }
+
+  function closeTenSummary(e:React.MouseEvent){
+    e.stopPropagation();
+    setAnimating(false);
+    setPendingResults([]);
+    setGachaStage("idle");
+    setBusy(false);
     setRevealIndex(0);
+    setSkipTen(false);
   }
 
   return <AppShell>
@@ -248,19 +276,33 @@ function Main(){
               </button>
             </div>
           </div>
-          {animating?<div className={"gacha-overlay stage-"+gachaStage+(gachaStage==="reveal"?" rarity-"+animationRarity.toLowerCase():"")} onClick={handleGachaTap}>
+          {animating?<div className={"gacha-overlay stage-"+gachaStage+((gachaStage==="reveal"||gachaStage==="summary")?" rarity-"+animationRarity.toLowerCase():"")} onClick={handleGachaTap}>
             <div className="gacha-backdrop"/>
             <div className="gacha-rays"/>
             <div className="gacha-stage">
-              {gachaStage!=="reveal"?<>
+              {(gachaStage==="tap"||gachaStage==="charging")?<>
                 <img className="gacha-machine-art" src="/assets/shuri-gacha-machine.svg?v=2" alt="SHURI GACHA machine"/>
                 <img className="gacha-capsule-art" src="/assets/shuri-capsule.svg?v=3" alt="gacha capsule"/>
                 {gachaStage==="tap"?<div className="gacha-copy">
                   <div className="gacha-message">TAP!</div>
                   <div className="gacha-tap">画面をタップ</div>
                 </div>:<div className="gacha-copy gacha-copy-empty" aria-hidden="true"/>}
-              </>:revealCard?<div className="gacha-reveal-wrap" onClick={advanceReveal}>
-
+                {pendingResults.length===10?<button className="gacha-skip-btn" onClick={skipTenReveal}>SKIP</button>:null}
+              </>:gachaStage==="summary"?<div className="ten-result-sheet" onClick={closeTenSummary}>
+                <div className="ten-result-head">
+                  <div><div className="eyebrow">10 PULL RESULT</div><h3>10連結果 🎴</h3></div>
+                  <span className="gacha-close-hint">タップで閉じる</span>
+                </div>
+                <div className="ten-card-grid">
+                  {pendingResults.map((r,i)=><div className={"ten-result-card rarity-"+r.rarity.toLowerCase()} key={r.result_position}>
+                    <span className="ten-card-number">{i+1}</span>
+                    <div className="ten-card-rarity">{r.rarity}</div>
+                    <div className="ten-card-art">🐰</div>
+                    <strong>{r.prize_title}</strong>
+                    <span className={r.is_duplicate?"dupe-badge":"new-badge"}>{r.is_duplicate?"+"+r.sp_awarded+" SP":"NEW!"}</span>
+                  </div>)}
+                </div>
+              </div>:revealCard?<div className="gacha-reveal-wrap" onClick={advanceReveal}>
                 <div className="gacha-burst">✦ ✧ ✦</div>
                 <div className={"gacha-prize-card rarity-"+revealCard.rarity.toLowerCase()}>
                   <div className="gacha-card-shine"/>
@@ -273,7 +315,7 @@ function Main(){
                 </div>
                 <div className="gacha-reveal-caption">{pendingResults.length===10&&!skipTen?((revealIndex+1)+" / 10"):pendingResults.length>1?"BEST CARD":"GET!"}</div>
                 {pendingResults.length===10&&!skipTen?<button className="gacha-skip-btn" onClick={skipTenReveal}>SKIP</button>:null}
-                <div className="gacha-close-hint">{pendingResults.length===10&&!skipTen?(revealIndex<9?"タップで次のカード":"タップで10枚一覧へ"):"タップで10枚一覧へ"}</div>
+                <div className="gacha-close-hint">{pendingResults.length===10&&!skipTen?(revealIndex<9?"タップで次のガチャ":"タップで10枚結果へ"):"タップで10枚結果へ"}</div>
               </div>:null}
             </div>
           </div>:null}
