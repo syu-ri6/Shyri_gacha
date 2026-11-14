@@ -315,7 +315,7 @@ function Main(){
                 </div>
                 <div className="gacha-reveal-caption">{pendingResults.length===10&&!skipTen?((revealIndex+1)+" / 10"):pendingResults.length>1?"BEST CARD":"GET!"}</div>
                 {pendingResults.length===10&&!skipTen?<button className="gacha-skip-btn" onClick={skipTenReveal}>SKIP</button>:null}
-                <div className="gacha-close-hint">{pendingResults.length===10&&!skipTen?(revealIndex<9?"タップで次のガチャ":"タップで10枚結果へ"):"タップで10枚結果へ"}</div>
+                <div className="gacha-close-hint">{pendingResults.length===10?(!skipTen?(revealIndex<9?"タップで次のガチャ":"タップで10枚結果へ"):"タップで10枚結果へ"):"タップで閉じる"}</div>
               </div>:null}
             </div>
           </div>:null}
