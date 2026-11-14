@@ -127,3 +127,23 @@ radial-gradient(circle at 50% 32%,#ffffff55,#d7a8e022 34%,transparent 58%);font-
 .collection-rarity-head{display:flex;align-items:center;justify-content:space-between;padding:0 2px}
 .collection-card-art{height:92px;border-radius:12px;display:grid;place-items:center;font-size:42px;background:radial-gradient(circle at 45% 35%,#ffffff66,#c9a4db22 45%,#171020 82%);border:1px solid #ffffff18}
 .collection-card{min-height:0}
+
+.collection-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.collection-thumb{appearance:none;width:100%;color:inherit;text-align:left;cursor:pointer;padding:8px;background:#21162f}
+.collection-thumb:active{transform:scale(.98)}
+.collection-thumb .collection-card-art{height:104px;font-size:38px}
+.collection-thumb strong{font-size:11px;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.collection-thumb .muted{font-size:9px}
+.collection-modal{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:22px}
+.collection-modal-backdrop{position:absolute;inset:0;background:#07040bcc;backdrop-filter:blur(8px)}
+.collection-modal-card{position:relative;z-index:1;width:min(88vw,390px);display:grid;justify-items:center;gap:10px}
+.collection-modal-close{position:absolute;top:-10px;right:-4px;z-index:3;width:38px;height:38px;border-radius:50%;border:1px solid #ffffff55;background:#1c1228;color:#fff;font-size:24px;line-height:1}
+.collection-large-card{position:relative;width:min(78vw,330px);aspect-ratio:3/4.3;border-radius:24px;overflow:hidden;border:3px solid #65516f;background:linear-gradient(160deg,#2c1a39,#140d1c);box-shadow:0 24px 80px #000b}
+.collection-large-card.rarity-r{border-color:#7aa7d8}
+.collection-large-card.rarity-sr{border-color:#a87ce1;box-shadow:0 24px 80px #000b,0 0 34px #a679ff55}
+.collection-large-card.rarity-ssr{border-color:#ef9bce;box-shadow:0 24px 80px #000b,0 0 42px #ff9bd766}
+.collection-large-card.rarity-ur{border-color:#f5df86;box-shadow:0 24px 80px #000b,0 0 50px #fff0a366}
+.collection-large-art{position:absolute;inset:0;display:grid;place-items:center;font-size:110px;background:radial-gradient(circle at 50% 35%,#ffffff44,#d2a8df22 35%,transparent 65%)}
+.collection-large-info{position:absolute;left:0;right:0;bottom:0;padding:20px 18px;background:linear-gradient(180deg,transparent,#0a0610e8 38%,#09060d 100%);display:grid;gap:7px}
+.collection-large-info h3{margin:0;font-size:24px;line-height:1.15}
+@media(max-width:390px){.collection-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.collection-thumb{padding:6px}.collection-thumb .collection-card-art{height:92px}}
