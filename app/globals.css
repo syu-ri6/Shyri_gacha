@@ -72,3 +72,17 @@
 .admin-search-panel{padding:10px 12px}
 .admin-search-panel .field{margin:0}
 @media(max-width:420px){.admin-page-nav{gap:4px;padding:6px}.admin-page-nav a{padding:8px 2px}.admin-page-nav a small{font-size:8px}.admin-menu-grid{grid-template-columns:1fr 1fr}}
+
+.ten-result-sheet{position:relative;z-index:5;width:min(94vw,460px);max-height:88vh;overflow:auto;padding:16px;border-radius:24px;background:linear-gradient(155deg,#25172f,#140c1c);border:1px solid #6a4a78;box-shadow:0 24px 80px #000b,0 0 36px #d99cff33}
+.ten-result-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:12px}.ten-result-head h3{margin:4px 0 0;font-size:22px}
+.ten-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.ten-result-card{position:relative;min-height:172px;border:2px solid #4b3a58;border-radius:16px;background:linear-gradient(160deg,#2a1a37,#17101f);padding:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center;overflow:hidden}
+.ten-result-card.rarity-r{border-color:#6e9bd0}.ten-result-card.rarity-sr{border-color:#9a70d8;box-shadow:0 0 16px #9e74ff33}.ten-result-card.rarity-ssr{border-color:#e18bc1;box-shadow:0 0 20px #ff93d644}.ten-result-card.rarity-ur{border-color:#f5df86;background:linear-gradient(150deg,#35204d,#63316a);box-shadow:0 0 24px #fff0a355}
+.ten-card-number{position:absolute;top:7px;left:8px;width:21px;height:21px;border-radius:50%;display:grid;place-items:center;background:#120b19b8;color:#d8c8df;font-size:9px;font-weight:900}
+.ten-card-rarity{font-size:11px;font-weight:1000;letter-spacing:1.5px}
+.ten-card-art{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;font-size:32px;background:radial-gradient(circle,#fff6,#c99ae533 45%,#21152d 80%);border:1px solid #ffffff2e}
+.ten-result-card strong{font-size:12px;line-height:1.25;word-break:break-word}
+.gacha-overlay.stage-summary .gacha-backdrop{background:radial-gradient(circle at center,#3b2351 0,#1b1027 48%,#09050d 100%)!important;animation:none}
+.gacha-overlay.stage-summary .gacha-rays{opacity:.12;animation:none}
+@media(min-width:430px){.ten-card-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.ten-result-card{min-height:155px;padding:9px}.ten-card-art{width:52px;height:52px}.ten-result-card strong{font-size:11px}}
+@media(max-height:760px){.ten-result-sheet{max-height:92vh}.ten-result-card{min-height:150px}.ten-card-art{width:48px;height:48px;font-size:27px}}
