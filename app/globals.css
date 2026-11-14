@@ -160,3 +160,16 @@ radial-gradient(circle at 50% 32%,#ffffff55,#d7a8e022 34%,transparent 58%);font-
   .collection-thumb{flex-basis:46vw}
   .collection-thumb .collection-card-art{height:175px!important}
 }
+
+/* Collection: phone-friendly multi-column grid, vertical scroll */
+.collection-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;overflow:visible!important;padding:4px 0 8px!important;scroll-snap-type:none!important}
+.collection-thumb{flex:none!important;width:100%!important;min-width:0!important;padding:6px!important}
+.collection-thumb .collection-card-art{height:auto!important;aspect-ratio:3/4!important;font-size:38px!important}
+.collection-thumb strong{font-size:10px!important;line-height:1.18!important;-webkit-line-clamp:2}
+.collection-thumb .muted{font-size:8px!important}
+.collection-rarity-section{margin-bottom:26px}
+@media(max-width:350px){
+  .collection-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:5px!important}
+  .collection-thumb{padding:5px!important}
+  .collection-thumb strong{font-size:9px!important}
+}
