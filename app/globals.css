@@ -8,14 +8,16 @@
 .gacha-burst{font-size:34px;letter-spacing:10px;line-height:1;margin-bottom:2px;text-shadow:0 0 22px #fff,0 0 50px #e8a5ff}
 .gacha-overlay.stage-tap .gacha-machine-art{animation:none}
 .gacha-overlay.stage-tap .gacha-capsule-art{animation:capsuleFloat 1.2s ease-in-out infinite alternate}
-.gacha-overlay.stage-charging .gacha-machine-art{animation:machineArtShake .16s ease-in-out infinite alternate}
-.gacha-overlay.stage-charging .gacha-capsule-art{animation:capsuleCharge .38s ease-in-out infinite alternate}
+.gacha-overlay.stage-charging .gacha-machine-art{animation:machineCharge .72s cubic-bezier(.2,.85,.25,1) forwards, machineTension .34s ease-in-out .72s infinite alternate}
+.gacha-overlay.stage-charging .gacha-capsule-art{animation:capsulePull .72s cubic-bezier(.2,.85,.25,1) forwards, capsuleTension .34s ease-in-out .72s infinite alternate}
 .gacha-overlay.stage-reveal .gacha-machine-art{animation:none}
 .gacha-overlay.stage-reveal .gacha-capsule-art{animation:capsuleReveal .42s cubic-bezier(.2,.9,.2,1) both}
 .gacha-machine,.gacha-window,.gacha-handle,.gacha-capsule{display:none!important}
 @keyframes capsuleFloat{from{transform:translateY(0) scale(.98)}to{transform:translateY(-7px) scale(1.02)}}
-@keyframes machineArtShake{from{transform:translateX(-3px) rotate(-.4deg)}to{transform:translateX(3px) rotate(.4deg)}}
-@keyframes capsuleCharge{from{transform:scale(.95);filter:drop-shadow(0 8px 20px #0007) brightness(.96)}to{transform:scale(1.08);filter:drop-shadow(0 10px 34px #ffc9efaa) brightness(1.18)}}
+@keyframes machineCharge{0%{transform:scale(1) translateY(0);filter:drop-shadow(0 18px 34px #0008) drop-shadow(0 0 26px #c174e755)}100%{transform:scale(.82) translateY(12px);filter:drop-shadow(0 10px 22px #0008) drop-shadow(0 0 34px #dca0ff88) brightness(1.04)}}
+@keyframes machineTension{from{transform:scale(.82) translateY(12px) rotate(-.35deg)}to{transform:scale(.79) translateY(14px) rotate(.35deg)}}
+@keyframes capsulePull{0%{transform:scale(1) translateY(0);filter:drop-shadow(0 10px 24px #0008)}100%{transform:scale(.8) translateY(-10px);filter:drop-shadow(0 8px 30px #ffc9ef88) brightness(1.08)}}
+@keyframes capsuleTension{from{transform:scale(.8) translateY(-10px)}to{transform:scale(.76) translateY(-13px)}}
 @keyframes capsuleReveal{from{transform:scale(.75);opacity:.45;filter:brightness(1)}to{transform:scale(1.16);opacity:1;filter:brightness(1.5)}}
 @media(max-height:720px){.gacha-stage{height:72vh;padding-top:12px}.gacha-machine-art{width:min(64vw,280px)}.gacha-capsule-art{width:96px;height:96px}.gacha-copy{margin-top:6px}}
 
