@@ -160,7 +160,7 @@ function Main(){
         setPendingResults([]);
         setGachaStage("idle");
         setBusy(false);
-      },900);
+      },1800);
     },ms);
   }
 
@@ -171,6 +171,8 @@ function Main(){
   }
 
   const statusLabel=profile?.verification_status==="verified"?"✅ 確認済み":profile?.verification_status==="pending"?"⏳ 承認待ち":profile?.verification_status==="rejected"?"❌ 再確認が必要":"未確認";
+  const rarityRank:Record<string,number>={N:1,R:2,SR:3,SSR:4,UR:5};
+  const revealCard=pendingResults.length?pendingResults.reduce((a,b)=>(rarityRank[b.rarity]||0)>(rarityRank[a.rarity]||0)?b:a,pendingResults[0]):null;
 
   return <AppShell>
     {!supabase?<div className="notice">🔧 Supabase接続設定が未完了です。</div>:null}
@@ -228,20 +230,31 @@ function Main(){
             <div className="gacha-backdrop"/>
             <div className="gacha-rays"/>
             <div className="gacha-stage">
-              <img className="gacha-machine-art" src="/assets/shuri-gacha-machine.svg?v=2" alt="SHURI GACHA machine"/>
-              <img className="gacha-capsule-art" src="/assets/shuri-capsule.svg?v=2" alt="gacha capsule"/>
-              <div className="gacha-copy">
-                {gachaStage==="tap"?<>
-                  <div className="gacha-message">TAP!</div>
-                  <div className="gacha-tap">画面をタップ</div>
-                </>:gachaStage==="charging"?<>
-                  <div className="gacha-message">ため中...</div>
-                  <div className="gacha-tap">結果を待ってね</div>
-                </>:<>
-                  <div className="gacha-burst">✦ ✧ ✦</div>
-                  <div className="gacha-message">{animationRarity==="UR"?"ULTRA RARE!!":animationRarity==="SSR"?"SSR!!":animationRarity==="SR"?"SR!!":animationRarity==="R"?"R!":"N!"}</div>
-                </>}
-              </div>
+              {gachaStage!=="reveal"?<>
+                <img className="gacha-machine-art" src="/assets/shuri-gacha-machine.svg?v=2" alt="SHURI GACHA machine"/>
+                <img className="gacha-capsule-art" src="/assets/shuri-capsule.svg?v=3" alt="gacha capsule"/>
+                <div className="gacha-copy">
+                  {gachaStage==="tap"?<>
+                    <div className="gacha-message">TAP!</div>
+                    <div className="gacha-tap">画面をタップ</div>
+                  </>:<>
+                    <div className="gacha-message">ため中...</div>
+                    <div className="gacha-tap">結果を待ってね</div>
+                  </>}
+                </div>
+              </>:revealCard?<div className="gacha-reveal-wrap">
+                <div className="gacha-burst">✦ ✧ ✦</div>
+                <div className={"gacha-prize-card rarity-"+revealCard.rarity.toLowerCase()}>
+                  <div className="gacha-card-shine"/>
+                  <div className="gacha-card-rarity">{revealCard.rarity}</div>
+                  <div className="gacha-card-art">🐰</div>
+                  <div className="gacha-card-title">{revealCard.prize_title}</div>
+                  <div className={revealCard.is_duplicate?"dupe-badge":"new-badge"}>
+                    {revealCard.is_duplicate?"重複 +"+revealCard.sp_awarded+" SP":"NEW!"}
+                  </div>
+                </div>
+                <div className="gacha-reveal-caption">{pendingResults.length>1?"最高レアのカード":"GET!"}</div>
+              </div>:null}
             </div>
           </div>:null}
           {results.length>0?<div className={"card stack result-panel rarity-"+animationRarity.toLowerCase()}><h3>✨ RESULT</h3><div className="result-grid">{results.map((r,i)=><div className={"result-card reveal rarity-"+r.rarity.toLowerCase()} style={{animationDelay:(i*90)+"ms"}} key={r.result_position}><span className="rarity">{r.rarity}</span><strong>{r.prize_title}</strong><span className={r.is_duplicate?"dupe-badge":"new-badge"}>{r.is_duplicate?"重複 +"+r.sp_awarded+" SP":"NEW!"}</span></div>)}</div><p className="muted">残り 🎟 {ticketBalance}枚</p></div>:null}
