@@ -122,3 +122,8 @@ radial-gradient(circle at 50% 32%,#ffffff55,#d7a8e022 34%,transparent 58%);font-
   .ten-strip-info strong{font-size:8px}
   .ten-strip-bottom .ten-card-rarity{font-size:12px}
 }
+
+.collection-rarity-section{display:grid;gap:8px;margin:14px 0 20px}
+.collection-rarity-head{display:flex;align-items:center;justify-content:space-between;padding:0 2px}
+.collection-card-art{height:92px;border-radius:12px;display:grid;place-items:center;font-size:42px;background:radial-gradient(circle at 45% 35%,#ffffff66,#c9a4db22 45%,#171020 82%);border:1px solid #ffffff18}
+.collection-card{min-height:0}
