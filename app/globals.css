@@ -200,3 +200,10 @@ radial-gradient(circle at 50% 32%,#ffffff55,#d7a8e022 34%,transparent 58%);font-
 @media(max-width:390px){
   .collection-modal-actions{grid-template-columns:1fr}
 }
+
+.admin-upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px;padding:0 12px}
+.admin-upload-box{display:grid;gap:7px;border:1px dashed #6a4d78;border-radius:13px;padding:12px;background:#1d1328;color:#eadcf0;font-size:11px}
+.admin-upload-box span{font-weight:900}
+.admin-upload-box input{width:100%;font-size:11px;color:#d9c7e2}
+.admin-upload-box small{color:#a995b3}
+@media(max-width:420px){.admin-upload-grid{grid-template-columns:1fr}}
