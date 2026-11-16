@@ -5,7 +5,7 @@ import AdminNav from "@/components/AdminNav";
 import {getSupabase} from "@/lib/supabase";
 
 type EventRow={id:string;title:string;status:string;prize_count:number;total_weight:number;created_at:string;published_at:string|null};
-type PrizeRow={id:string;title:string;rarity:string;weight:number;is_secret:boolean;card_image_url:string|null;download_url:string|null;download_kind:"audio"|"image"|"video"|"file"|null};
+type PrizeRow={id:string;title:string;rarity:string;weight:number;is_secret:boolean;card_image_url:string|null;download_url:string|null;download_kind:"audio"|"image"|"video"|"file"|null;card_image_path:string|null;download_path:string|null};
 type SpRate={rarity:string;sp_amount:number};
 
 export default function AdminEvents(){
@@ -38,7 +38,7 @@ export default function AdminEvents(){
   async function loadPrizes(id:string|null){
     if(!supabase||!id){setPrizes([]);setSpRates([]);return;}
     const [p,s]=await Promise.all([
-      supabase.rpc("shuri_admin_get_prizes_v2",{target_event:id}),
+      supabase.rpc("shuri_admin_get_prizes_v3",{target_event:id}),
       supabase.rpc("shuri_admin_get_sp_rates",{target_event:id})
     ]);
     if(p.error)setError(p.error.message);else{
@@ -58,6 +58,39 @@ export default function AdminEvents(){
   async function deletePrize(id:string){if(!supabase||!selected)return;setBusy(id);const {error}=await supabase.rpc("shuri_admin_delete_prize",{target_prize:id});if(error)setError(error.message);else await Promise.all([load(),loadPrizes(selected)]);setBusy(null)}
   async function saveSpRate(r:string){if(!supabase||!selected)return;const amount=Number(spDraft[r]??0);if(!Number.isInteger(amount)||amount<0){setError("SPは0以上の整数にしてね");return;}setBusy("sp-"+r);const {error}=await supabase.rpc("shuri_admin_set_sp_rate",{target_event:selected,target_rarity:r,new_amount:amount});if(error)setError(error.message);else await loadPrizes(selected);setBusy(null)}
   async function setStatus(id:string,status:"active"|"paused"|"ended"){if(!supabase)return;setBusy("event-"+id);const {error}=await supabase.rpc("shuri_admin_set_event_status",{target_event:id,new_status:status});if(error)setError(error.message);else await load();setBusy(null)}
+  function safeFileName(name:string){
+    return name.toLowerCase().replace(/[^a-z0-9._-]+/g,"-").replace(/-+/g,"-");
+  }
+
+  async function uploadPrizeAsset(prize:PrizeRow,file:File,kind:"card"|"download"){
+    if(!supabase)return;
+    setError("");
+    setBusy("upload-"+prize.id+"-"+kind);
+    const path=prize.id+"/"+kind+"/"+Date.now()+"-"+safeFileName(file.name);
+    const {error:uploadError}=await supabase.storage.from("shuri-gacha-assets").upload(path,file,{
+      cacheControl:"3600",
+      upsert:false,
+      contentType:file.type||undefined
+    });
+    if(uploadError){setError(uploadError.message);setBusy(null);return;}
+
+    const currentCard=kind==="card"?path:prize.card_image_path;
+    const currentDownload=kind==="download"?path:prize.download_path;
+    const inferredKind=kind==="download"
+      ? (file.type.startsWith("audio/")?"audio":file.type.startsWith("image/")?"image":file.type.startsWith("video/")?"video":"file")
+      : prize.download_kind;
+
+    const {error:rpcError}=await supabase.rpc("shuri_admin_set_prize_asset_paths",{
+      target_prize:prize.id,
+      new_card_image_path:currentCard,
+      new_download_path:currentDownload,
+      new_download_kind:currentDownload?(inferredKind||"file"):null
+    });
+    if(rpcError)setError(rpcError.message);
+    else await loadPrizes(selected);
+    setBusy(null);
+  }
+
   async function saveMedia(id:string){
     if(!supabase)return;
     const m=mediaDraft[id]??{card:"",download:"",kind:"file"};
@@ -90,7 +123,19 @@ export default function AdminEvents(){
             <label>カード画像URL<input className="field" value={mediaDraft[p.id]?.card??""} onChange={e=>setMediaDraft(v=>({...v,[p.id]:{...(v[p.id]??{card:"",download:"",kind:"file"}),card:e.target.value}}))} placeholder="https://..."/></label>
             <label>ダウンロード素材URL<input className="field" value={mediaDraft[p.id]?.download??""} onChange={e=>setMediaDraft(v=>({...v,[p.id]:{...(v[p.id]??{card:"",download:"",kind:"file"}),download:e.target.value}}))} placeholder="音源・画像・ファイルのURL"/></label>
             <label>素材タイプ<select className="field" value={mediaDraft[p.id]?.kind??"file"} onChange={e=>setMediaDraft(v=>({...v,[p.id]:{...(v[p.id]??{card:"",download:"",kind:"file"}),kind:e.target.value}}))}><option value="audio">音源 / ボイス</option><option value="image">画像</option><option value="video">動画</option><option value="file">その他ファイル</option></select></label>
-            <button className="btn block" disabled={busy==="media-"+p.id} onClick={()=>saveMedia(p.id)}>素材設定を保存</button>
+            <button className="btn block" disabled={busy==="media-"+p.id} onClick={()=>saveMedia(p.id)}>URL設定を保存</button>
+            <div className="admin-upload-grid">
+              <label className="admin-upload-box">
+                <span>🖼 カード画像をアップロード</span>
+                <input type="file" accept="image/*" disabled={busy!==null} onChange={e=>{const file=e.target.files?.[0];if(file)uploadPrizeAsset(p,file,"card");e.currentTarget.value="";}}/>
+                <small>{p.card_image_path?"登録済み":"未登録"}</small>
+              </label>
+              <label className="admin-upload-box">
+                <span>🎧 音源・素材をアップロード</span>
+                <input type="file" accept="audio/*,image/*,video/*,.zip,.pdf" disabled={busy!==null} onChange={e=>{const file=e.target.files?.[0];if(file)uploadPrizeAsset(p,file,"download");e.currentTarget.value="";}}/>
+                <small>{p.download_path?"登録済み":"未登録"}</small>
+              </label>
+            </div>
           </details>
         </div>)}</div>
         <div className="admin-subpanel"><div className="admin-subpanel-title"><strong>重複時SHURI POINT</strong><span className="muted">レア度ごとの変換量</span></div><div className="sp-rate-grid admin-sp-grid">{spRates.map(r=><div className="sp-rate-row" key={r.rarity}><strong className={"rarity-pill rarity-"+r.rarity.toLowerCase()}>{r.rarity}</strong><input className="field" type="number" value={spDraft[r.rarity]??String(r.sp_amount)} onChange={e=>setSpDraft(v=>({...v,[r.rarity]:e.target.value}))}/><button className="btn secondary" onClick={()=>saveSpRate(r.rarity)} disabled={busy==="sp-"+r.rarity}>保存</button></div>)}</div></div>
