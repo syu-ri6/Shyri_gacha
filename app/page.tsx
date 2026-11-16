@@ -23,6 +23,7 @@ type CollectionItem={
   event_id:string;event_title:string;prize_id:string;prize_title:string;
   rarity:string;is_secret:boolean;obtained_count:number;first_obtained_at:string;
   card_image_url:string|null;download_url:string|null;download_kind:"audio"|"image"|"video"|"file"|null;
+  card_image_path:string|null;download_path:string|null;
 };
 
 function Main(){
@@ -36,6 +37,7 @@ function Main(){
   const [spBalance,setSpBalance]=useState(0);
   const [collection,setCollection]=useState<CollectionItem[]>([]);
   const [selectedCollection,setSelectedCollection]=useState<CollectionItem|null>(null);
+  const [signedAssets,setSignedAssets]=useState<Record<string,{card?:string;download?:string}>>({});
   const [event,setEvent]=useState<GachaEvent|null>(null);
   const [prizes,setPrizes]=useState<GachaPrize[]>([]);
   const [results,setResults]=useState<DrawResult[]>([]);
@@ -97,9 +99,23 @@ function Main(){
   useEffect(()=>{
     if(user&&view==="gacha")refreshGacha();
     if(user&&view==="collection"&&supabase){
-      supabase.rpc("shuri_get_collection_v2").then(({data,error})=>{
-        if(error)setError(error.message);
-        else setCollection((data??[]) as CollectionItem[]);
+      supabase.rpc("shuri_get_collection_v3").then(async({data,error})=>{
+        if(error){setError(error.message);return;}
+        const items=(data??[]) as CollectionItem[];
+        setCollection(items);
+        const entries=await Promise.all(items.map(async item=>{
+          const urls:{card?:string;download?:string}={};
+          if(item.card_image_path){
+            const {data:s}=await supabase.storage.from("shuri-gacha-assets").createSignedUrl(item.card_image_path,3600);
+            if(s?.signedUrl)urls.card=s.signedUrl;
+          }
+          if(item.download_path){
+            const {data:s}=await supabase.storage.from("shuri-gacha-assets").createSignedUrl(item.download_path,3600);
+            if(s?.signedUrl)urls.download=s.signedUrl;
+          }
+          return [item.prize_id,urls] as const;
+        }));
+        setSignedAssets(Object.fromEntries(entries));
       });
     }
   },[user,view]);
@@ -389,7 +405,7 @@ function Main(){
                 <div className="collection-grid">
                   {items.map(x=><button type="button" className={"collection-card collection-thumb rarity-"+x.rarity.toLowerCase()} key={x.prize_id} onClick={()=>setSelectedCollection(x)}>
                     <span className="rarity">{x.rarity}</span>
-                    <div className="collection-card-art">{x.card_image_url?<img src={x.card_image_url} alt={x.prize_title}/>:<span>🐰</span>}</div>
+                    <div className="collection-card-art">{(signedAssets[x.prize_id]?.card||x.card_image_url)?<img src={signedAssets[x.prize_id]?.card||x.card_image_url||""} alt={x.prize_title}/>:<span>🐰</span>}</div>
                     <strong>{x.prize_title}</strong>
                     <span className="muted">獲得 {x.obtained_count}回</span>
                   </button>)}
@@ -398,12 +414,12 @@ function Main(){
             })}
           </div>)}
         </>}
-        {collection.some(x=>x.download_url)?<div className="collection-downloads">
+        {collection.some(x=>x.download_url||x.download_path)?<div className="collection-downloads">
           <div className="row"><h3>DOWNLOADS 🎧</h3><span className="muted">獲得済み</span></div>
           <div className="collection-download-list">
-            {collection.filter(x=>x.download_url).map(x=><div className="collection-download-row" key={x.prize_id}>
+            {collection.filter(x=>x.download_url||x.download_path).map(x=><div className="collection-download-row" key={x.prize_id}>
               <div><strong>{x.prize_title}</strong><div className="muted">{x.download_kind==="audio"?"音源 / ボイス":x.download_kind==="image"?"画像":x.download_kind==="video"?"動画":"ファイル"}</div></div>
-              <button className="btn secondary" onClick={()=>downloadOwned(x.download_url,x.prize_title)}>保存</button>
+              <button className="btn secondary" disabled={!(signedAssets[x.prize_id]?.download||x.download_url)} onClick={()=>downloadOwned(signedAssets[x.prize_id]?.download||x.download_url,x.prize_title)}>保存</button>
             </div>)}
           </div>
         </div>:null}
@@ -412,7 +428,7 @@ function Main(){
           <div className="collection-modal-card" onClick={e=>e.stopPropagation()}>
             <button type="button" className="collection-modal-close" onClick={()=>setSelectedCollection(null)}>×</button>
             <div className={"collection-large-card rarity-"+selectedCollection.rarity.toLowerCase()}>
-              <div className="collection-large-art">{selectedCollection.card_image_url?<img src={selectedCollection.card_image_url} alt={selectedCollection.prize_title}/>:<span>🐰</span>}</div>
+              <div className="collection-large-art">{(signedAssets[selectedCollection.prize_id]?.card||selectedCollection.card_image_url)?<img src={signedAssets[selectedCollection.prize_id]?.card||selectedCollection.card_image_url||""} alt={selectedCollection.prize_title}/>:<span>🐰</span>}</div>
               <div className="collection-large-info">
                 <span className={"rarity-pill rarity-"+selectedCollection.rarity.toLowerCase()}>{selectedCollection.rarity}</span>
                 <h3>{selectedCollection.prize_title}</h3>
@@ -420,8 +436,8 @@ function Main(){
               </div>
             </div>
             <div className="collection-modal-actions">
-              <button className="btn" disabled={!selectedCollection.card_image_url} onClick={()=>downloadOwned(selectedCollection.card_image_url,selectedCollection.prize_title+".png")}>🖼 カードを保存</button>
-              {selectedCollection.download_url?<button className="btn secondary" onClick={()=>downloadOwned(selectedCollection.download_url,selectedCollection.prize_title)}>⬇ 素材を保存</button>:null}
+              <button className="btn" disabled={!(signedAssets[selectedCollection.prize_id]?.card||selectedCollection.card_image_url)} onClick={()=>downloadOwned(signedAssets[selectedCollection.prize_id]?.card||selectedCollection.card_image_url,selectedCollection.prize_title+".png")}>🖼 カードを保存</button>
+              {(signedAssets[selectedCollection.prize_id]?.download||selectedCollection.download_url)?<button className="btn secondary" onClick={()=>downloadOwned(signedAssets[selectedCollection.prize_id]?.download||selectedCollection.download_url,selectedCollection.prize_title)}>⬇ 素材を保存</button>:null}
             </div>
             <div className="gacha-close-hint">外側をタップして閉じる</div>
           </div>
